@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kloudkut"
+version = "5.1.0"
+dynamic = []
+description = "AWS Cost Optimization — identify idle resources and save money"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+authors = [
+    { name = "KloudKut Contributors" }
+]
+maintainers = [
+    { name = "KloudKut Contributors" }
+]
+keywords = ["aws", "cost-optimization", "cloud", "finops", "cost-management", "idle-resources"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Monitoring",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "boto3>=1.42",
+    "botocore>=1.35",
+    "pyyaml>=6.0",
+    "colorama>=0.4",
+    "tqdm>=4.67",
+    "flask>=3.1.3",
+    "requests>=2.32.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/shivajichaprana/kloudkut"
+Repository = "https://github.com/shivajichaprana/kloudkut"
+Issues = "https://github.com/shivajichaprana/kloudkut/issues"
+Changelog = "https://github.com/shivajichaprana/kloudkut/blob/master/CHANGELOG.md"
+
+[project.scripts]
+kloudkut = "kloudkut.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

@@ -1,5 +1,12 @@
+FROM python:3.12-slim
 
-FROM public.ecr.aws/lambda/python:3.9.2022.11.24.17
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
-RUN pip3 install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
-CMD [ "main.cfnresponsefun" ]
+
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "main.py"]

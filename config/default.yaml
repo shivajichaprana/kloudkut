@@ -1,0 +1,193 @@
+# Default thresholds — do not edit. Override in config/config.yaml
+
+resources:
+  EC2:
+    avgCpu: 1
+    maxCpu: 1
+    netInOut: 5000
+    rightsizeCpu: 20
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  RDS:
+    connectionCount: 0
+    rightsizeConnections: 5
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  LAMBDA:
+    invocations: 0
+    cloudwatch_metrics_days: 30
+    cloudwatch_metrics_period: 2592000
+
+  DYNAMODB:
+    readCapacityUnits: 5
+    writeCapacityUnits: 5
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  S3:
+    days_since_last_modified: 90
+    min_size_gb: 0
+
+  EBS:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  EFS:
+    max_connections: 1
+    min_read_gb: 0.1
+    min_write_gb: 0.1
+    cloudwatch_metrics_days: 7
+    cloudwatch_metrics_period: 604800
+
+  FSX:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  BACKUP:
+    days_old: 90
+
+  ECR:
+    days_old: 180
+
+  ECS:
+    max_cpu: 5
+    max_tasks: 1
+    cloudwatch_metrics_days: 7
+    cloudwatch_metrics_period: 604800
+
+  EKS:
+    cloudwatch_metrics_days: 14
+
+  EMR:
+    idle_threshold: 0.8
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  GLUE:
+    days: 30
+
+  LIGHTSAIL:
+    days: 14
+
+  CODEBUILD:
+    days: 90
+
+  REDSHIFT:
+    dbConnectionCount: 0
+    max_cpu: 10
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  ELASTICACHE:
+    sumCacheHitMiss: 0
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  DOCUMENTDB:
+    max_cpu: 10
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  AURORA:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  OPENSEARCH:
+    max_cpu: 10
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  MSK:
+    min_bytes: 1000
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  LB:
+    connectionCount: 1
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  NATGATEWAY:
+    bytesOutToSource: 1000000
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  CLOUDFRONT:
+    min_requests: 100
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  APIGATEWAY:
+    min_requests: 10
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  VPC_ENDPOINTS:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  ROUTE53:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  KINESIS:
+    min_records: 100
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  SQS:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  SNS:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  STEPFUNCTIONS:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  SAGEMAKER:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  ATHENA:
+    days: 90
+
+  CLOUDFORMATION:
+    days: 30
+
+  EVENTBRIDGE:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  CLOUDWATCH_ALARMS:
+    days: 14
+
+  CLOUDWATCH_LOGS:
+    retention_days_threshold: 30
+    days_since_last_event: 90
+
+  GUARDDUTY:
+    days: 30
+
+  WAF:
+    cloudwatch_metrics_days: 14
+    cloudwatch_metrics_period: 1209600
+
+  KMS:
+    days: 90
+
+  SECRETSMANAGER:
+    days: 90
+
+  MACIE:
+    days: 30
+
+  SECURITYHUB:
+    days: 30
+
+  RESERVED_INSTANCES:
+    min_days_running: 30
