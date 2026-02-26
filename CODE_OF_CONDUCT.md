@@ -24,7 +24,7 @@ Project maintainers are responsible for clarifying standards and will take appro
 
 ## Reporting
 
-Report issues to: shivajichaprana@gmail.com
+Report issues to: shivajichaprana97@gmail.com
 
 ## Attribution
 

@@ -12,7 +12,7 @@
 We take security seriously. If you discover a security vulnerability, please:
 
 1. **DO NOT** open a public issue
-2. Email shivajichaprana@gmail.com with:
+2. Email shivajichaprana97@gmail.com with:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact
