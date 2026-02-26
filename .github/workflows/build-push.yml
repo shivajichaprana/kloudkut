@@ -1,44 +1,30 @@
-name: ReleaseZip
+name: Release
 
 on:
   push:
-    branches:
-      - develop
-      - master
-      
-permissions:
-  id-token: write
-  contents: read 
+    tags:
+      - "v*"
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-    - uses: actions/checkout@v1
-    - name: Create zip
-      run: bash ZipCode.sh
+      - uses: actions/checkout@v4
 
-    - name: configure aws credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        role-to-assume: '${{secrets.IAMROLE_GITHUB}}'
-        role-duration-seconds: 900 # the ttl of the session, in seconds.
-        aws-region: us-east-1 # u
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
 
-    - name: push Zip to s3 
-      run: aws s3 cp /tmp/penny/penny.zip s3://'${{secrets.AWS_S3_BUCKET_NAME}}'/
-      env:
-        LOCAL_PATH: '/tmp/penny/'
-        AWS_S3_BUCKET: '${{secrets.AWS_S3_BUCKET_NAME}}'
+      - run: pip install -r requirements.txt pytest build
 
-    - name: making zip public
-      run: aws s3api put-object-acl --acl public-read --bucket '${{secrets.AWS_S3_BUCKET_NAME}}' --key penny.zip
-    
-    - name: push CFN to s3 
-      run: aws s3 cp penny_pincher_cfn.yml  s3://'${{secrets.AWS_S3_BUCKET_NAME}}'/
-      env:
-        AWS_S3_BUCKET: '${{secrets.AWS_S3_BUCKET_NAME}}'
+      - run: pytest tests/ -v --tb=short
 
-    - name: making CFN public
-      run: aws s3api put-object-acl --acl public-read --bucket '${{secrets.AWS_S3_BUCKET_NAME}}' --key penny_pincher_cfn.yml
-        
+      - run: python -m build
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

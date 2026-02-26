@@ -1,0 +1,30 @@
+name: Bug Report
+description: Report a bug or issue
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      placeholder: What happened?
+    validations:
+      required: true
+  
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Run command...
+        2. See error...
+    validations:
+      required: true
+  
+  - type: input
+    id: version
+    attributes:
+      label: KloudKut Version
+      placeholder: "5.0.0"
+    validations:
+      required: true

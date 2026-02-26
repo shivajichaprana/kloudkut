@@ -1,0 +1,34 @@
+# KloudKut User Configuration
+# Override default thresholds here. All values are optional.
+
+resources:
+  EC2:
+    avgCpu: 5        # Flag EC2 with avg CPU below this %
+    maxCpu: 10
+    netInOut: 10000
+    exclude_tags:    # Resources with these tags will be skipped
+      Environment: production
+      # DoNotDelete: "true"
+
+  RDS:
+    connectionCount: 0
+    exclude_tags:
+      Environment: production
+
+  LAMBDA:
+    invocations: 0
+    cloudwatch_metrics_days: 30
+
+  S3:
+    days_since_last_modified: 90
+
+  CLOUDWATCH_LOGS:
+    days_since_last_event: 90
+
+notifications:
+  slack:
+    webhook_url: ""          # Optional Slack webhook URL
+  email:
+    from_address: ""         # SES verified sender address
+    to_address: ""           # Recipient(s), comma-separated
+    ses_region: "us-east-1"

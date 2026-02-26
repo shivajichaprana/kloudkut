@@ -126,6 +126,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
 .venv
 env/
 venv/
@@ -165,10 +166,27 @@ cython_debug/
 #.idea/
 
 # Reports
-pennypincher_csv_report*
+kloudkut_csv_report*
 findings*.*
-pennypincher_findings*.*
-pennypincher_reports*
+kloudkut_findings*.*
+kloudkut_reports*
+report.html
+reports/
+
+# Cache
+.kloudkut_cache/
+.cache/
+cache.db
+
+# History
+.kloudkut_history.db
+
+# Partial scan state
+.kloudkut_partial.json
+
+# Development
+memory.md
+
 #Zip Files
 *.zip
 
