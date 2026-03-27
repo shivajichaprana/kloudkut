@@ -57,6 +57,61 @@ kloudkut --json findings.json --html report.html
 kloudkut --min-cost 100 --fail-on-findings
 ```
 
+## Architecture
+
+```
+┌──────────────┐     ┌───────────────────────────────────────────┐
+│  CLI / CI/CD │────▶│              KloudKut Engine               │
+│  Interface   │     │                                           │
+└──────────────┘     │  ┌─────────────┐  ┌────────────────────┐  │
+                     │  │ Service     │  │ Smart Cache        │  │
+                     │  │ Scanner     │  │ (1h TTL, 90% less  │  │
+                     │  │ (45+ AWS)   │  │  API calls)        │  │
+                     │  └──────┬──────┘  └────────────────────┘  │
+                     │         │                                  │
+                     │         ▼                                  │
+                     │  ┌─────────────────────────────────────┐  │
+                     │  │      Parallel Region Scanner        │  │
+                     │  │  (concurrent multi-region + account)│  │
+                     │  └──────┬──────────────────────────────┘  │
+                     │         │                                  │
+                     │         ▼                                  │
+                     │  ┌─────────────┐  ┌────────────────────┐  │
+                     │  │ Cost        │  │ Report Generator   │  │
+                     │  │ Analyzer    │  │ (HTML/CSV/JSON/    │  │
+                     │  │             │  │  SARIF/JUnit)      │  │
+                     │  └─────────────┘  └────────────────────┘  │
+                     └───────────────────────────────────────────┘
+                               │
+                     ┌─────────┼─────────┐
+                     ▼         ▼         ▼
+              ┌──────────┐ ┌───────┐ ┌──────────┐
+              │  Slack   │ │  SES  │ │ Web      │
+              │ Alerts   │ │ Email │ │ Dashboard│
+              └──────────┘ └───────┘ └──────────┘
+```
+
+## Project Structure
+
+```
+kloudkut/
+├── kloudkut/              # Core package
+│   ├── __init__.py
+│   ├── scanner.py         # Service scanners (45+ AWS services)
+│   ├── cache.py           # Smart caching layer
+│   ├── reporter.py        # Multi-format report generation
+│   └── notifier.py        # Slack/SES notifications
+├── tests/                 # Unit tests
+├── config/                # Configuration templates
+├── examples/              # Usage examples
+├── docs/                  # API & architecture docs
+├── .github/workflows/     # CI pipeline
+├── Dockerfile             # Container deployment
+├── docker-compose.yml     # Dashboard setup
+├── Makefile               # Dev shortcuts
+└── pyproject.toml         # Package config
+```
+
 ## 📚 Documentation
 
 - [Quick Start](QUICKSTART.md)
