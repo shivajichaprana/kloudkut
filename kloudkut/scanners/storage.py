@@ -2,7 +2,8 @@
 import logging
 from datetime import datetime, timedelta, UTC
 from botocore.exceptions import ClientError
-from kloudkut.core import BaseScanner, Finding, get_client, get_sum
+from kloudkut.core import BaseScanner, Finding, get_client, get_sum, ebs_monthly, efs_monthly
+from kloudkut.core.pricing import region_multiplier
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +49,6 @@ class S3Scanner(BaseScanner):
 class EBSScanner(BaseScanner):
     service = "EBS"
 
-    # EBS per-GB/mo prices (us-east-1) — verified against AWS docs
-    _EBS_GB_MONTHLY = {
-        "gp2": 0.10, "gp3": 0.08, "io1": 0.125, "io2": 0.125,
-        "st1": 0.045, "sc1": 0.015, "standard": 0.05,
-    }
-
     def scan_region(self, region):
         findings = []
         ec2 = get_client("ec2", region)
@@ -61,10 +56,9 @@ class EBSScanner(BaseScanner):
             for vol in page.get("Volumes", []):
                 name = next((t["Value"] for t in vol.get("Tags", []) if t["Key"] == "Name"), vol["VolumeId"])
                 vtype = vol.get("VolumeType", "gp2")
-                gb_price = self._EBS_GB_MONTHLY.get(vtype, 0.10)
-                monthly = round(vol["Size"] * gb_price, 2)
+                monthly = ebs_monthly(vol["Size"], vtype, region)
                 findings.append(Finding(vol["VolumeId"], name, "EBS", region,
-                                        f"Unattached {vtype} volume ({vol['Size']} GB) — not connected to any instance but billed ${gb_price}/GB/mo. Snapshot & delete if no longer needed",
+                                        f"Unattached {vtype} volume ({vol['Size']} GB) — not connected to any instance but billed at full storage rate. Snapshot & delete if no longer needed",
                                         monthly,
                                         remediation=f"aws ec2 delete-volume --volume-id {vol['VolumeId']} --region {region}"))
         return findings
@@ -84,8 +78,8 @@ class EFSScanner(BaseScanner):
                 write = get_sum(region, "AWS/EFS", "DataWriteIOBytes", "FileSystemId", fsid, self.cw_days, self.cw_period)
                 if read == 0 and write == 0:
                     findings.append(Finding(fsid, fsid, "EFS", region,
-                                            f"Zero read/write I/O over {self.cw_days}d ({size_gb:.1f} GB stored) — you're paying $0.30/GB/mo for storage no one is accessing. Delete or move data to S3 if unused",
-                                            round(size_gb * 0.30, 2)))
+                                            f"Zero read/write I/O over {self.cw_days}d ({size_gb:.1f} GB stored) — you're paying for storage no one is accessing. Delete or move data to S3 if unused",
+                                            efs_monthly(size_gb, region)))
         return findings
 
 
@@ -104,7 +98,7 @@ class FSxScanner(BaseScanner):
                     cap = fs["StorageCapacity"]
                     findings.append(Finding(fsid, fsid, f"FSx-{fs['FileSystemType']}", region,
                                             f"Zero read/write I/O over {self.cw_days}d ({cap} GB capacity) — billed for provisioned storage regardless of usage. Delete if no workloads depend on it",
-                                            round(cap * 0.15, 2)))
+                                            round(cap * 0.15 * region_multiplier(region), 2)))
         return findings
 
 

@@ -48,7 +48,7 @@ class NATGatewayScanner(BaseScanner):
                 if bytes_out < self.config.get("bytesOutToSource", 1000000):
                     findings.append(Finding(natid, natid, "NAT Gateway", region,
                                             f"Near-zero traffic over {self.cw_days}d ({bytes_out:.0f} bytes out) — NAT Gateway charges $0.045/hr ($32.85/mo) plus data processing fees even when idle. Delete if private subnets no longer need internet access",
-                                            nat_monthly()))
+                                            nat_monthly(region)))
         return findings
 
 

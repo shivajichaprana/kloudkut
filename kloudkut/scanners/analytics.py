@@ -1,6 +1,6 @@
 """Analytics, messaging, and management scanners."""
 from datetime import datetime, timedelta, UTC
-from kloudkut.core import BaseScanner, Finding, get_client, get_sum, sagemaker_monthly
+from kloudkut.core import BaseScanner, Finding, get_client, get_sum, sagemaker_monthly, cw_logs_monthly
 
 
 class KinesisScanner(BaseScanner):
@@ -86,10 +86,10 @@ class SageMakerScanner(BaseScanner):
                     try:
                         cfg = sm.describe_endpoint(EndpointName=name)
                         itype = cfg.get("ProductionVariants", [{}])[0].get("CurrentInstanceType", "ml.m5.xlarge")
-                        monthly = sagemaker_monthly(itype)
+                        monthly = sagemaker_monthly(itype, region)
                     except Exception:
                         itype = "ml.m5.xlarge"
-                        monthly = sagemaker_monthly(itype)
+                        monthly = sagemaker_monthly(itype, region)
                     findings.append(Finding(name, name, "SageMaker", region,
                                             f"Zero invocations over {self.cw_days}d ({itype}) — endpoint instances run 24/7 and are billed per-hour even with no inference requests. Delete endpoint if model is no longer serving predictions",
                                             monthly))
@@ -180,7 +180,8 @@ class CloudWatchLogsScanner(BaseScanner):
             for lg in page.get("logGroups", []):
                 if lg.get("lastIngestionTime", 0) < threshold:
                     size_mb = lg.get("storedBytes", 0) / (1024 * 1024)
+                    monthly = cw_logs_monthly(size_mb, region)
                     findings.append(Finding(lg["logGroupName"], lg["logGroupName"], "CloudWatch Logs", region,
-                                            f"No log events ingested in {days}+ days ({size_mb:.1f} MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed",
-                                            round(size_mb * 0.03, 2)))
+                                            f"No log events ingested in {days}+ days ({size_mb:.1f} MB stored) — storage charges apply for retained logs. Set a retention policy or delete if the source service has been removed",
+                                            monthly))
         return findings

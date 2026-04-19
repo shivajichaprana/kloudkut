@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta, UTC
 from botocore.exceptions import ClientError
 from kloudkut.core import BaseScanner, Finding, get_client, get_avg, get_sum, ec2_monthly, eks_monthly
-from kloudkut.core.pricing import downsize_suggestion, region_multiplier
+from kloudkut.core.pricing import downsize_suggestion
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class EC2Scanner(BaseScanner):
                     if i["State"]["Name"] == "stopped":
                         findings.append(Finding(iid, name, "EC2", region,
                                                 f"Stopped instance ({itype}) — still incurring EBS storage charges. Terminate if no longer needed, or snapshot & delete volumes",
-                                                round(ec2_monthly(itype) * region_multiplier(region), 2),
+                                                ec2_monthly(itype, region),
                                                 {"instance_type": itype, "console_url":
                                                  f"https://{region}.console.aws.amazon.com/ec2/v2/home?region={region}#Instances:instanceId={iid}"},
                                                 remediation=f"aws ec2 terminate-instances --instance-ids {iid} --region {region}"))
@@ -46,7 +46,7 @@ class EC2Scanner(BaseScanner):
                     avg_cpu = get_avg(region, "AWS/EC2", "CPUUtilization", "InstanceId", iid, self.cw_days, self.cw_period)
                     net_in = get_sum(region, "AWS/EC2", "NetworkIn", "InstanceId", iid, self.cw_days, self.cw_period)
                     net_out = get_sum(region, "AWS/EC2", "NetworkOut", "InstanceId", iid, self.cw_days, self.cw_period)
-                    monthly = round(ec2_monthly(itype) * region_multiplier(region), 2)
+                    monthly = ec2_monthly(itype, region)
 
                     if avg_cpu < self.config.get("avgCpu", 1) and (net_in + net_out) < self.config.get("netInOut", 5000):
                         waste = round(monthly * (1 - avg_cpu / 100), 2)
@@ -60,7 +60,7 @@ class EC2Scanner(BaseScanner):
                     elif avg_cpu < self.config.get("rightsizeCpu", 20) and downsize_suggestion(itype):
                         # Right-sizing: instance is oversized but not idle
                         smaller = downsize_suggestion(itype)
-                        saving = round((ec2_monthly(itype) - ec2_monthly(smaller)) * region_multiplier(region), 2)
+                        saving = round(ec2_monthly(itype, region) - ec2_monthly(smaller, region), 2)
                         if saving > 0:
                             findings.append(Finding(iid, name, "EC2", region,
                                                     f"Oversized ({itype}, CPU {avg_cpu:.1f}% over {self.cw_days}d) — downsize to {smaller} for same workload at lower cost",

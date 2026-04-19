@@ -6,6 +6,7 @@ from kloudkut.core.pricing import (
     ec2_monthly, rds_monthly, redshift_monthly, elasticache_monthly,
     sagemaker_monthly, opensearch_monthly, msk_monthly, eks_monthly,
     nat_monthly, documentdb_monthly, aurora_monthly,
+    ebs_monthly, efs_monthly, cw_logs_monthly,
 )
 from kloudkut.core.notify import notify
 from kloudkut.core.history import save_scan, get_trend, get_delta
@@ -19,6 +20,7 @@ __all__ = [
     "ec2_monthly", "rds_monthly", "redshift_monthly", "elasticache_monthly",
     "sagemaker_monthly", "opensearch_monthly", "msk_monthly", "eks_monthly",
     "nat_monthly", "documentdb_monthly", "aurora_monthly",
+    "ebs_monthly", "efs_monthly", "cw_logs_monthly",
     "get_metrics", "get_summary", "clear_metrics",
     "get_system_status", "check_aws_credentials",
 ]

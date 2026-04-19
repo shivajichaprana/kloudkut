@@ -25,7 +25,7 @@ class RDSScanner(BaseScanner):
                 if conns <= self.config.get("connectionCount", 0):
                     iclass = db.get("DBInstanceClass", "db.t3.micro")
                     multi_az = db.get("MultiAZ", False)
-                    monthly = rds_monthly(iclass, multi_az)
+                    monthly = rds_monthly(iclass, multi_az, region)
                     az_note = " (Multi-AZ doubles cost)" if multi_az else ""
                     findings.append(Finding(dbid, dbid, "RDS", region,
                                             f"Zero database connections over {self.cw_days}d ({iclass}{az_note}) — instance is running and billed hourly even with no clients connected. Stop or snapshot & delete if unused",
@@ -36,7 +36,7 @@ class RDSScanner(BaseScanner):
                     iclass = db.get("DBInstanceClass", "")
                     smaller = downsize_suggestion(iclass)
                     if smaller:
-                        saving = round(rds_monthly(iclass, db.get("MultiAZ", False)) - rds_monthly(smaller, db.get("MultiAZ", False)), 2)
+                        saving = round(rds_monthly(iclass, db.get("MultiAZ", False), region) - rds_monthly(smaller, db.get("MultiAZ", False), region), 2)
                         if saving > 0:
                             findings.append(Finding(dbid, dbid, "RDS", region,
                                                     f"Oversized — only {conns:.0f} avg connections over {self.cw_days}d on {iclass}. Downsize to {smaller} for same workload at lower hourly rate",
@@ -76,7 +76,7 @@ class RedshiftScanner(BaseScanner):
                 if conns <= self.config.get("dbConnectionCount", 0):
                     ntype = cluster["NodeType"]
                     nodes = cluster["NumberOfNodes"]
-                    monthly = redshift_monthly(ntype, nodes)
+                    monthly = redshift_monthly(ntype, nodes, region)
                     findings.append(Finding(cid, cid, "Redshift", region,
                                             f"Zero connections over {self.cw_days}d ({nodes}× {ntype}) — cluster is billed per-node per-hour even when idle. Pause, resize, or delete if unused",
                                             monthly,
@@ -98,7 +98,7 @@ class ElastiCacheScanner(BaseScanner):
                 if hits + misses <= self.config.get("sumCacheHitMiss", 0):
                     ntype = cache.get("CacheNodeType", "cache.m5.large")
                     nnodes = cache.get("NumCacheNodes", 1)
-                    monthly = elasticache_monthly(ntype, nnodes)
+                    monthly = elasticache_monthly(ntype, nnodes, region)
                     findings.append(Finding(cid, cid, "ElastiCache", region,
                                             f"Zero cache hits/misses over {self.cw_days}d ({nnodes}× {ntype}) — no application is using this cache but you're billed per-node per-hour. Delete if no longer needed",
                                             monthly))
@@ -118,7 +118,7 @@ class DocumentDBScanner(BaseScanner):
                 if conns == 0:
                     iclass = cluster.get("DBClusterMembers", [{}])[0].get("DBInstanceClass", "db.r5.large")
                     nmembers = len(cluster.get("DBClusterMembers", [1]))
-                    monthly = documentdb_monthly(iclass, nmembers)
+                    monthly = documentdb_monthly(iclass, nmembers, region)
                     findings.append(Finding(cid, cid, "DocumentDB", region,
                                             f"Zero connections over {self.cw_days}d ({nmembers}× {iclass}) — cluster instances are billed hourly plus I/O and storage. Delete cluster if unused",
                                             monthly))
@@ -140,7 +140,7 @@ class AuroraScanner(BaseScanner):
                 if conns == 0:
                     iclass = cluster.get("DBClusterMembers", [{}])[0].get("DBInstanceClass", "db.r5.large")
                     nmembers = len(cluster.get("DBClusterMembers", [1]))
-                    monthly = aurora_monthly(iclass, nmembers)
+                    monthly = aurora_monthly(iclass, nmembers, region)
                     findings.append(Finding(cid, cid, "Aurora", region,
                                             f"Zero connections over {self.cw_days}d ({nmembers}× {iclass}) — Aurora charges per-instance hourly plus I/O and storage. Delete or switch to Aurora Serverless v2 if usage is sporadic",
                                             monthly))
@@ -160,10 +160,10 @@ class OpenSearchScanner(BaseScanner):
                     cfg = os_client.describe_domain(DomainName=name)["DomainStatus"]
                     itype = cfg.get("ClusterConfig", {}).get("InstanceType", "m5.large.search")
                     count = cfg.get("ClusterConfig", {}).get("InstanceCount", 1)
-                    monthly = opensearch_monthly(itype, count)
+                    monthly = opensearch_monthly(itype, count, region)
                 except Exception:
                     itype, count = "m5.large.search", 1
-                    monthly = opensearch_monthly(itype)
+                    monthly = opensearch_monthly(itype, 1, region)
                 findings.append(Finding(name, name, "OpenSearch", region,
                                         f"Zero search queries over {self.cw_days}d ({count}× {itype}) — domain instances are billed hourly plus EBS storage. Delete domain or reduce instance count if unused",
                                         monthly))
@@ -185,10 +185,10 @@ class MSKScanner(BaseScanner):
                         info = msk.describe_cluster(ClusterArn=cluster["ClusterArn"])["ClusterInfo"]
                         itype = info.get("BrokerNodeGroupInfo", {}).get("InstanceType", "kafka.m5.large")
                         brokers = info.get("NumberOfBrokerNodes", 2)
-                        monthly = msk_monthly(itype, brokers)
+                        monthly = msk_monthly(itype, brokers, region)
                     except Exception:
                         itype, brokers = "kafka.m5.large", 2
-                        monthly = msk_monthly(itype)
+                        monthly = msk_monthly(itype, 2, region)
                     findings.append(Finding(name, name, "MSK", region,
                                             f"Near-zero throughput over {self.cw_days}d ({bytes_in:.0f} bytes in, {brokers}× {itype}) — brokers are billed per-hour regardless of traffic. Delete cluster if no longer producing/consuming",
                                             monthly))
@@ -245,7 +245,7 @@ class ReservedInstanceScanner(BaseScanner):
                         continue
                     name = next((t["Value"] for t in i.get("Tags", []) if t["Key"] == "Name"), i["InstanceId"])
                     from kloudkut.core.pricing import ec2_monthly
-                    monthly = ec2_monthly(itype)
+                    monthly = ec2_monthly(itype, region)
                     # 1-year RI saves ~40% on average
                     saving = round(monthly * 0.40, 2)
                     findings.append(Finding(
