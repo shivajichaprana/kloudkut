@@ -36,7 +36,8 @@ class EC2Scanner(BaseScanner):
 
                     if i["State"]["Name"] == "stopped":
                         findings.append(Finding(iid, name, "EC2", region,
-                                                f"Stopped {itype}", round(ec2_monthly(itype) * region_multiplier(region), 2),
+                                                f"Stopped instance ({itype}) — still incurring EBS storage charges. Terminate if no longer needed, or snapshot & delete volumes",
+                                                round(ec2_monthly(itype) * region_multiplier(region), 2),
                                                 {"instance_type": itype, "console_url":
                                                  f"https://{region}.console.aws.amazon.com/ec2/v2/home?region={region}#Instances:instanceId={iid}"},
                                                 remediation=f"aws ec2 terminate-instances --instance-ids {iid} --region {region}"))
@@ -50,7 +51,8 @@ class EC2Scanner(BaseScanner):
                     if avg_cpu < self.config.get("avgCpu", 1) and (net_in + net_out) < self.config.get("netInOut", 5000):
                         waste = round(monthly * (1 - avg_cpu / 100), 2)
                         findings.append(Finding(iid, name, "EC2", region,
-                                                f"CPU {avg_cpu:.1f}% ({itype})", waste,
+                                                f"Idle instance ({itype}) — avg CPU {avg_cpu:.1f}% over {self.cw_days}d with near-zero network. You're paying full On-Demand rate for an unused instance. Stop or terminate it",
+                                                waste,
                                                 {"instance_type": itype, "cpu": avg_cpu,
                                                  "network": net_in + net_out,
                                                  "console_url": f"https://{region}.console.aws.amazon.com/ec2/v2/home?region={region}#Instances:instanceId={iid}"},
@@ -61,7 +63,8 @@ class EC2Scanner(BaseScanner):
                         saving = round((ec2_monthly(itype) - ec2_monthly(smaller)) * region_multiplier(region), 2)
                         if saving > 0:
                             findings.append(Finding(iid, name, "EC2", region,
-                                                    f"Oversized {itype} (CPU {avg_cpu:.1f}%) → {smaller}", saving,
+                                                    f"Oversized ({itype}, CPU {avg_cpu:.1f}% over {self.cw_days}d) — downsize to {smaller} for same workload at lower cost",
+                                                    saving,
                                                     {"instance_type": itype, "suggested_type": smaller, "cpu": avg_cpu,
                                                      "console_url": f"https://{region}.console.aws.amazon.com/ec2/v2/home?region={region}#Instances:instanceId={iid}"},
                                                     remediation=f"aws ec2 modify-instance-attribute --instance-id {iid} --instance-type {{\"Value\":\"{smaller}\"}} --region {region}"))
@@ -87,7 +90,9 @@ class LambdaScanner(BaseScanner):
                     logger.debug("Lambda list_tags failed for %s: %s", name, e)
                 invocations = get_sum(region, "AWS/Lambda", "Invocations", "FunctionName", name, self.cw_days, self.cw_period)
                 if invocations <= self.config.get("invocations", 0):
-                    findings.append(Finding(name, name, "Lambda", region, "No invocations", 5.0,
+                    findings.append(Finding(name, name, "Lambda", region,
+                                            f"Zero invocations in {self.cw_days}d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete",
+                                            5.0,
                                             {"console_url": f"https://{region}.console.aws.amazon.com/lambda/home?region={region}#/functions/{name}"}))
         return findings
 
@@ -110,7 +115,8 @@ class ECSScanner(BaseScanner):
                     for svc in ecs.describe_services(cluster=cluster_arn, services=svc_arns[i:i+10]).get("services", []):
                         if svc["runningCount"] == 0:
                             findings.append(Finding(svc["serviceName"], svc["serviceName"], "ECS", region,
-                                                    "Zero running tasks", svc["desiredCount"] * 30.0))
+                                                    f"Service has 0 running tasks (desired: {svc['desiredCount']}) — the cluster and service definition still cost overhead. Scale down or delete if no longer needed",
+                                                    svc["desiredCount"] * 30.0))
         return findings
 
 
@@ -126,7 +132,9 @@ class EKSScanner(BaseScanner):
                 cluster = eks.describe_cluster(name=name)["cluster"]
                 nodegroups = eks.list_nodegroups(clusterName=name).get("nodegroups", [])
                 if not nodegroups or cluster["status"] != "ACTIVE":
-                    findings.append(Finding(name, name, "EKS", region, "No active nodegroups", eks_monthly()))
+                    findings.append(Finding(name, name, "EKS", region,
+                                            f"EKS cluster with no active node groups — the control plane charges $0.10/hr ($73/mo) even with zero workloads. Delete if unused",
+                                            eks_monthly()))
         return findings
 
 
@@ -142,7 +150,9 @@ class EMRScanner(BaseScanner):
                 cid = cluster["Id"]
                 is_idle = get_avg(region, "AWS/ElasticMapReduce", "IsIdle", "JobFlowId", cid, self.cw_days, self.cw_period)
                 if is_idle > self.config.get("idle_threshold", 0.8):
-                    findings.append(Finding(cid, cluster["Name"], "EMR", region, f"IsIdle={is_idle:.2f}", 500.0))
+                    findings.append(Finding(cid, cluster["Name"], "EMR", region,
+                                            f"Cluster idle {is_idle*100:.0f}% of the last {self.cw_days}d — running EC2 instances in the cluster still incur full hourly charges. Terminate or enable auto-termination",
+                                            500.0))
         return findings
 
 
@@ -160,7 +170,9 @@ class GlueScanner(BaseScanner):
                 runs = glue.get_job_runs(JobName=name, MaxResults=5).get("JobRuns", [])
                 if not any(r["StartedOn"] > datetime.now(UTC) - timedelta(days=days) for r in runs):
                     capacity = job.get("MaxCapacity", 2)
-                    findings.append(Finding(name, name, "Glue", region, f"No runs in {days}d", capacity * 0.44 * 10))
+                    findings.append(Finding(name, name, "Glue", region,
+                                            f"No job runs in {days}d (capacity: {capacity} DPU) — job definition exists but is never triggered. Delete or disable if obsolete to avoid accidental runs",
+                                            capacity * 0.44 * 10))
         return findings
 
 
@@ -181,7 +193,9 @@ class LightsailScanner(BaseScanner):
     def scan_region(self, region):
         findings = []
         try:
-            findings = [Finding(inst["name"], inst["name"], "Lightsail", region, "Stopped", 3.5)
+            findings = [Finding(inst["name"], inst["name"], "Lightsail", region,
+                                "Stopped Lightsail instance — you're still billed the fixed monthly plan rate even while stopped. Delete or create a snapshot & terminate",
+                                3.5)
                         for inst in get_client("lightsail", region).get_instances().get("instances", [])
                         if inst["state"]["name"] == "stopped"]
         except ClientError as e:
@@ -203,5 +217,7 @@ class CodeBuildScanner(BaseScanner):
                 ids = cb.list_builds_for_project(projectName=name).get("ids", [])
                 if not ids or not any(b.get("startTime", cutoff) > cutoff
                                       for b in cb.batch_get_builds(ids=ids[:5]).get("builds", [])):
-                    findings.append(Finding(name, name, "CodeBuild", region, f"No builds in {days}d", 1.0))
+                    findings.append(Finding(name, name, "CodeBuild", region,
+                                            f"No builds triggered in {days}d — project exists but is inactive. Delete if CI/CD pipeline has moved elsewhere",
+                                            1.0))
         return findings

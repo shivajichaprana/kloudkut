@@ -23,9 +23,14 @@ class RDSScanner(BaseScanner):
                 dbid = db["DBInstanceIdentifier"]
                 conns = get_avg(region, "AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", dbid, self.cw_days, self.cw_period)
                 if conns <= self.config.get("connectionCount", 0):
-                    monthly = rds_monthly(db.get("DBInstanceClass", "db.t3.micro"), db.get("MultiAZ", False))
-                    findings.append(Finding(dbid, dbid, "RDS", region, "Zero connections", monthly,
-                                            {"instance_class": db.get("DBInstanceClass"), "connections": conns,
+                    iclass = db.get("DBInstanceClass", "db.t3.micro")
+                    multi_az = db.get("MultiAZ", False)
+                    monthly = rds_monthly(iclass, multi_az)
+                    az_note = " (Multi-AZ doubles cost)" if multi_az else ""
+                    findings.append(Finding(dbid, dbid, "RDS", region,
+                                            f"Zero database connections over {self.cw_days}d ({iclass}{az_note}) — instance is running and billed hourly even with no clients connected. Stop or snapshot & delete if unused",
+                                            monthly,
+                                            {"instance_class": iclass, "connections": conns,
                                              "console_url": f"https://{region}.console.aws.amazon.com/rds/home?region={region}#database:id={dbid}"}))
                 elif conns < self.config.get("rightsizeConnections", 5):
                     iclass = db.get("DBInstanceClass", "")
@@ -34,7 +39,8 @@ class RDSScanner(BaseScanner):
                         saving = round(rds_monthly(iclass, db.get("MultiAZ", False)) - rds_monthly(smaller, db.get("MultiAZ", False)), 2)
                         if saving > 0:
                             findings.append(Finding(dbid, dbid, "RDS", region,
-                                                    f"Oversized {iclass} (conns={conns:.0f}) → {smaller}", saving,
+                                                    f"Oversized — only {conns:.0f} avg connections over {self.cw_days}d on {iclass}. Downsize to {smaller} for same workload at lower hourly rate",
+                                                    saving,
                                                     {"instance_class": iclass, "suggested_class": smaller,
                                                      "console_url": f"https://{region}.console.aws.amazon.com/rds/home?region={region}#database:id={dbid}"}))
         return findings
@@ -51,7 +57,9 @@ class DynamoDBScanner(BaseScanner):
                 rcu = get_sum(region, "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", table, self.cw_days, self.cw_period)
                 wcu = get_sum(region, "AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", table, self.cw_days, self.cw_period)
                 if rcu < self.config.get("readCapacityUnits", 5) and wcu < self.config.get("writeCapacityUnits", 5):
-                    findings.append(Finding(table, table, "DynamoDB", region, f"RCU={rcu:.0f} WCU={wcu:.0f}", 25.0))
+                    findings.append(Finding(table, table, "DynamoDB", region,
+                                            f"Near-zero usage over {self.cw_days}d (reads: {rcu:.0f}, writes: {wcu:.0f}) — provisioned capacity or on-demand minimum charges apply even with no traffic. Delete table or switch to on-demand if rarely used",
+                                            25.0))
         return findings
 
 
@@ -66,9 +74,13 @@ class RedshiftScanner(BaseScanner):
                 cid = cluster["ClusterIdentifier"]
                 conns = get_avg(region, "AWS/Redshift", "DatabaseConnections", "ClusterIdentifier", cid, self.cw_days, self.cw_period)
                 if conns <= self.config.get("dbConnectionCount", 0):
-                    monthly = redshift_monthly(cluster["NodeType"], cluster["NumberOfNodes"])
-                    findings.append(Finding(cid, cid, "Redshift", region, "Zero connections", monthly,
-                                            {"node_type": cluster["NodeType"], "nodes": cluster["NumberOfNodes"]}))
+                    ntype = cluster["NodeType"]
+                    nodes = cluster["NumberOfNodes"]
+                    monthly = redshift_monthly(ntype, nodes)
+                    findings.append(Finding(cid, cid, "Redshift", region,
+                                            f"Zero connections over {self.cw_days}d ({nodes}× {ntype}) — cluster is billed per-node per-hour even when idle. Pause, resize, or delete if unused",
+                                            monthly,
+                                            {"node_type": ntype, "nodes": nodes}))
         return findings
 
 
@@ -84,11 +96,12 @@ class ElastiCacheScanner(BaseScanner):
                 hits = get_sum(region, "AWS/ElastiCache", "CacheHits", "CacheClusterId", cid, self.cw_days, self.cw_period)
                 misses = get_sum(region, "AWS/ElastiCache", "CacheMisses", "CacheClusterId", cid, self.cw_days, self.cw_period)
                 if hits + misses <= self.config.get("sumCacheHitMiss", 0):
-                    monthly = elasticache_monthly(
-                        cache.get("CacheNodeType", "cache.m5.large"),
-                        cache.get("NumCacheNodes", 1)
-                    )
-                    findings.append(Finding(cid, cid, "ElastiCache", region, "Zero cache activity", monthly))
+                    ntype = cache.get("CacheNodeType", "cache.m5.large")
+                    nnodes = cache.get("NumCacheNodes", 1)
+                    monthly = elasticache_monthly(ntype, nnodes)
+                    findings.append(Finding(cid, cid, "ElastiCache", region,
+                                            f"Zero cache hits/misses over {self.cw_days}d ({nnodes}× {ntype}) — no application is using this cache but you're billed per-node per-hour. Delete if no longer needed",
+                                            monthly))
         return findings
 
 
@@ -103,11 +116,12 @@ class DocumentDBScanner(BaseScanner):
                 cid = cluster["DBClusterIdentifier"]
                 conns = get_avg(region, "AWS/DocDB", "DatabaseConnections", "DBClusterIdentifier", cid, self.cw_days, self.cw_period)
                 if conns == 0:
-                    monthly = documentdb_monthly(
-                        cluster.get("DBClusterMembers", [{}])[0].get("DBInstanceClass", "db.r5.large"),
-                        len(cluster.get("DBClusterMembers", [1]))
-                    )
-                    findings.append(Finding(cid, cid, "DocumentDB", region, "Zero connections", monthly))
+                    iclass = cluster.get("DBClusterMembers", [{}])[0].get("DBInstanceClass", "db.r5.large")
+                    nmembers = len(cluster.get("DBClusterMembers", [1]))
+                    monthly = documentdb_monthly(iclass, nmembers)
+                    findings.append(Finding(cid, cid, "DocumentDB", region,
+                                            f"Zero connections over {self.cw_days}d ({nmembers}× {iclass}) — cluster instances are billed hourly plus I/O and storage. Delete cluster if unused",
+                                            monthly))
         return findings
 
 
@@ -124,11 +138,12 @@ class AuroraScanner(BaseScanner):
                 cid = cluster["DBClusterIdentifier"]
                 conns = get_avg(region, "AWS/RDS", "DatabaseConnections", "DBClusterIdentifier", cid, self.cw_days, self.cw_period)
                 if conns == 0:
-                    monthly = aurora_monthly(
-                        cluster.get("DBClusterMembers", [{}])[0].get("DBInstanceClass", "db.r5.large"),
-                        len(cluster.get("DBClusterMembers", [1]))
-                    )
-                    findings.append(Finding(cid, cid, "Aurora", region, "Zero connections", monthly))
+                    iclass = cluster.get("DBClusterMembers", [{}])[0].get("DBInstanceClass", "db.r5.large")
+                    nmembers = len(cluster.get("DBClusterMembers", [1]))
+                    monthly = aurora_monthly(iclass, nmembers)
+                    findings.append(Finding(cid, cid, "Aurora", region,
+                                            f"Zero connections over {self.cw_days}d ({nmembers}× {iclass}) — Aurora charges per-instance hourly plus I/O and storage. Delete or switch to Aurora Serverless v2 if usage is sporadic",
+                                            monthly))
         return findings
 
 
@@ -147,8 +162,11 @@ class OpenSearchScanner(BaseScanner):
                     count = cfg.get("ClusterConfig", {}).get("InstanceCount", 1)
                     monthly = opensearch_monthly(itype, count)
                 except Exception:
-                    monthly = opensearch_monthly("m5.large.search")
-                findings.append(Finding(name, name, "OpenSearch", region, "Zero search rate", monthly))
+                    itype, count = "m5.large.search", 1
+                    monthly = opensearch_monthly(itype)
+                findings.append(Finding(name, name, "OpenSearch", region,
+                                        f"Zero search queries over {self.cw_days}d ({count}× {itype}) — domain instances are billed hourly plus EBS storage. Delete domain or reduce instance count if unused",
+                                        monthly))
         return findings
 
 
@@ -169,8 +187,11 @@ class MSKScanner(BaseScanner):
                         brokers = info.get("NumberOfBrokerNodes", 2)
                         monthly = msk_monthly(itype, brokers)
                     except Exception:
-                        monthly = msk_monthly("kafka.m5.large")
-                    findings.append(Finding(name, name, "MSK", region, f"BytesIn={bytes_in:.0f}", monthly))
+                        itype, brokers = "kafka.m5.large", 2
+                        monthly = msk_monthly(itype)
+                    findings.append(Finding(name, name, "MSK", region,
+                                            f"Near-zero throughput over {self.cw_days}d ({bytes_in:.0f} bytes in, {brokers}× {itype}) — brokers are billed per-hour regardless of traffic. Delete cluster if no longer producing/consuming",
+                                            monthly))
         return findings
 
 
@@ -229,7 +250,8 @@ class ReservedInstanceScanner(BaseScanner):
                     saving = round(monthly * 0.40, 2)
                     findings.append(Finding(
                         i["InstanceId"], name, "Reserved Instances", region,
-                        f"{itype} On-Demand {age_days}d, no RI/SP", saving,
+                        f"Running On-Demand for {age_days}d ({itype}) with no Reserved Instance or Savings Plan coverage — a 1-year RI would save ~40%. Consider purchasing RI or Compute Savings Plan",
+                        saving,
                         {"instance_type": itype, "age_days": age_days,
                          "console_url": f"https://{region}.console.aws.amazon.com/ec2/v2/home?region={region}#ReservedInstances:"},
                         remediation=f"aws ec2 purchase-reserved-instances-offering --instance-type {itype} --region {region}"

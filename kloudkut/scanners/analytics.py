@@ -14,7 +14,9 @@ class KinesisScanner(BaseScanner):
                 records = get_sum(region, "AWS/Kinesis", "IncomingRecords", "StreamName", name, self.cw_days, self.cw_period)
                 if records < self.config.get("min_records", 100):
                     shards = len(kinesis.describe_stream(StreamName=name)["StreamDescription"]["Shards"])
-                    findings.append(Finding(name, name, "Kinesis", region, f"Records={records:.0f}", shards * 11.0))
+                    findings.append(Finding(name, name, "Kinesis", region,
+                                            f"Only {records:.0f} incoming records over {self.cw_days}d ({shards} shard{'s' if shards > 1 else ''}) — each shard costs ~$11/mo in hourly charges regardless of throughput. Reduce shard count or delete stream if unused",
+                                            shards * 11.0))
         return findings
 
 
@@ -30,7 +32,9 @@ class SQSScanner(BaseScanner):
                 sent = get_sum(region, "AWS/SQS", "NumberOfMessagesSent", "QueueName", name, self.cw_days, self.cw_period)
                 received = get_sum(region, "AWS/SQS", "NumberOfMessagesReceived", "QueueName", name, self.cw_days, self.cw_period)
                 if sent == 0 and received == 0:
-                    findings.append(Finding(name, name, "SQS", region, "No messages", 0.5))
+                    findings.append(Finding(name, name, "SQS", region,
+                                            f"Zero messages sent or received over {self.cw_days}d — queue exists but is completely inactive. Delete if the producer/consumer has been decommissioned",
+                                            0.5))
         return findings
 
 
@@ -45,7 +49,9 @@ class SNSScanner(BaseScanner):
                 name = topic["TopicArn"].split(":")[-1]
                 published = get_sum(region, "AWS/SNS", "NumberOfMessagesPublished", "TopicName", name, self.cw_days, self.cw_period)
                 if published == 0:
-                    findings.append(Finding(name, name, "SNS", region, "No messages published", 0.5))
+                    findings.append(Finding(name, name, "SNS", region,
+                                            f"Zero messages published over {self.cw_days}d — topic exists but no publisher is sending to it. Delete if subscribers have been removed or migrated",
+                                            0.5))
         return findings
 
 
@@ -60,7 +66,9 @@ class StepFunctionsScanner(BaseScanner):
                 arn, name = sm["stateMachineArn"], sm["name"]
                 started = get_sum(region, "AWS/States", "ExecutionsStarted", "StateMachineArn", arn, self.cw_days, self.cw_period)
                 if started == 0:
-                    findings.append(Finding(name, name, "Step Functions", region, "No executions", 25.0))
+                    findings.append(Finding(name, name, "Step Functions", region,
+                                            f"Zero executions started over {self.cw_days}d — state machine definition exists but is never triggered. Delete if the workflow has been replaced or is obsolete",
+                                            25.0))
         return findings
 
 
@@ -80,8 +88,11 @@ class SageMakerScanner(BaseScanner):
                         itype = cfg.get("ProductionVariants", [{}])[0].get("CurrentInstanceType", "ml.m5.xlarge")
                         monthly = sagemaker_monthly(itype)
                     except Exception:
-                        monthly = sagemaker_monthly("ml.m5.xlarge")
-                    findings.append(Finding(name, name, "SageMaker", region, "No invocations", monthly))
+                        itype = "ml.m5.xlarge"
+                        monthly = sagemaker_monthly(itype)
+                    findings.append(Finding(name, name, "SageMaker", region,
+                                            f"Zero invocations over {self.cw_days}d ({itype}) — endpoint instances run 24/7 and are billed per-hour even with no inference requests. Delete endpoint if model is no longer serving predictions",
+                                            monthly))
         return findings
 
 
@@ -95,7 +106,9 @@ class AthenaScanner(BaseScanner):
             for wg in page.get("WorkGroups", []):
                 name = wg["Name"]
                 if not athena.list_query_executions(WorkGroup=name, MaxResults=5).get("QueryExecutionIds"):
-                    findings.append(Finding(name, name, "Athena", region, "No queries", 5.0))
+                    findings.append(Finding(name, name, "Athena", region,
+                                            "Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned",
+                                            5.0))
         return findings
 
 
@@ -109,8 +122,10 @@ class CloudFormationScanner(BaseScanner):
             StackStatusFilter=["CREATE_FAILED", "ROLLBACK_COMPLETE", "DELETE_FAILED"]
         ):
             for stack in page.get("StackSummaries", []):
+                status = stack["StackStatus"]
                 findings.append(Finding(stack["StackName"], stack["StackName"], "CloudFormation", region,
-                                        f"Status: {stack['StackStatus']}", 1.0))
+                                        f"Stack in failed state ({status}) — failed stacks may leave behind provisioned resources (EC2, RDS, etc.) still incurring charges. Investigate and delete the stack to clean up orphaned resources",
+                                        1.0))
         return findings
 
 
@@ -122,7 +137,9 @@ class EventBridgeScanner(BaseScanner):
         for page in get_client("events", region).get_paginator("list_rules").paginate():
             for rule in page.get("Rules", []):
                 if rule["State"] == "DISABLED":
-                    findings.append(Finding(rule["Name"], rule["Name"], "EventBridge", region, "Disabled rule", 0.5))
+                    findings.append(Finding(rule["Name"], rule["Name"], "EventBridge", region,
+                                            "EventBridge rule is disabled — while disabled rules don't trigger, they add clutter and may reference Lambda/SNS targets that are also unused. Delete if the automation is no longer needed",
+                                            0.5))
         return findings
 
 
@@ -135,7 +152,9 @@ class CloudWatchAlarmsScanner(BaseScanner):
             for alarm in page.get("MetricAlarms", []):
                 if alarm["StateValue"] == "INSUFFICIENT_DATA":
                     findings.append(Finding(alarm["AlarmName"], alarm["AlarmName"], "CloudWatch Alarm",
-                                            region, "Insufficient data", 0.1))
+                                            region,
+                                            "Alarm stuck in INSUFFICIENT_DATA — the monitored metric is not reporting, likely because the resource was deleted. Each alarm costs $0.10/mo. Delete orphaned alarms",
+                                            0.1))
         return findings
 
 
@@ -153,5 +172,6 @@ class CloudWatchLogsScanner(BaseScanner):
                 if lg.get("lastIngestionTime", 0) < threshold:
                     size_mb = lg.get("storedBytes", 0) / (1024 * 1024)
                     findings.append(Finding(lg["logGroupName"], lg["logGroupName"], "CloudWatch Logs", region,
-                                            f"No events in {days}d", round(size_mb * 0.03, 2)))
+                                            f"No log events ingested in {days}+ days ({size_mb:.1f} MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed",
+                                            round(size_mb * 0.03, 2)))
         return findings

@@ -31,10 +31,14 @@ class S3Scanner(BaseScanner):
                     continue
                 resp = s3.list_objects_v2(Bucket=name, MaxKeys=1)
                 if resp["KeyCount"] == 0:
-                    findings.append(Finding(name, name, "S3", region, "Empty bucket", 1.0,
+                    findings.append(Finding(name, name, "S3", region,
+                                            "Empty bucket with zero objects — still incurs request charges and may have lifecycle rules or replication adding overhead. Delete if unused",
+                                            1.0,
                                             remediation=f"aws s3 rb s3://{name} --force"))
                 elif resp["Contents"][0]["LastModified"] < cutoff:
-                    findings.append(Finding(name, name, "S3", region, f"No activity in {days}d", 5.0,
+                    findings.append(Finding(name, name, "S3", region,
+                                            f"No objects modified in {days}+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data",
+                                            5.0,
                                             remediation=f"aws s3 rb s3://{name} --force"))
             except ClientError as e:
                 logger.debug("S3 bucket %s skipped: %s", name, e)
@@ -50,7 +54,9 @@ class EBSScanner(BaseScanner):
         for page in ec2.get_paginator("describe_volumes").paginate(Filters=[{"Name": "status", "Values": ["available"]}]):
             for vol in page.get("Volumes", []):
                 name = next((t["Value"] for t in vol.get("Tags", []) if t["Key"] == "Name"), vol["VolumeId"])
-                findings.append(Finding(vol["VolumeId"], name, "EBS", region, "Unattached volume",
+                vtype = vol.get("VolumeType", "gp2")
+                findings.append(Finding(vol["VolumeId"], name, "EBS", region,
+                                        f"Unattached {vtype} volume ({vol['Size']} GB) — not connected to any instance but billed at full storage rate. Snapshot & delete if no longer needed",
                                         round(vol["Size"] * 0.10, 2),
                                         remediation=f"aws ec2 delete-volume --volume-id {vol['VolumeId']} --region {region}"))
         return findings
@@ -69,7 +75,9 @@ class EFSScanner(BaseScanner):
                 read = get_sum(region, "AWS/EFS", "DataReadIOBytes", "FileSystemId", fsid, self.cw_days, self.cw_period)
                 write = get_sum(region, "AWS/EFS", "DataWriteIOBytes", "FileSystemId", fsid, self.cw_days, self.cw_period)
                 if read == 0 and write == 0:
-                    findings.append(Finding(fsid, fsid, "EFS", region, "No I/O activity", round(size_gb * 0.30, 2)))
+                    findings.append(Finding(fsid, fsid, "EFS", region,
+                                            f"Zero read/write I/O over {self.cw_days}d ({size_gb:.1f} GB stored) — you're paying $0.30/GB/mo for storage no one is accessing. Delete or move data to S3 if unused",
+                                            round(size_gb * 0.30, 2)))
         return findings
 
 
@@ -85,8 +93,10 @@ class FSxScanner(BaseScanner):
                 read = get_sum(region, "AWS/FSx", "DataReadBytes", "FileSystemId", fsid, self.cw_days, self.cw_period)
                 write = get_sum(region, "AWS/FSx", "DataWriteBytes", "FileSystemId", fsid, self.cw_days, self.cw_period)
                 if read == 0 and write == 0:
-                    findings.append(Finding(fsid, fsid, f"FSx-{fs['FileSystemType']}", region, "No I/O",
-                                            round(fs["StorageCapacity"] * 0.15, 2)))
+                    cap = fs["StorageCapacity"]
+                    findings.append(Finding(fsid, fsid, f"FSx-{fs['FileSystemType']}", region,
+                                            f"Zero read/write I/O over {self.cw_days}d ({cap} GB capacity) — billed for provisioned storage regardless of usage. Delete if no workloads depend on it",
+                                            round(cap * 0.15, 2)))
         return findings
 
 
@@ -106,7 +116,8 @@ class BackupScanner(BaseScanner):
                 for rpage in backup.get_paginator("list_recovery_points_by_backup_vault").paginate(BackupVaultName=name):
                     old_count += sum(1 for p in rpage.get("RecoveryPoints", []) if p["CreationDate"] < cutoff)
                 if old_count:
-                    findings.append(Finding(name, name, "Backup", region, f"{old_count} old backups",
+                    findings.append(Finding(name, name, "Backup", region,
+                                            f"{old_count} backup recovery points older than {days}d in vault — each stored backup incurs per-GB storage charges. Review retention policy or delete stale backups",
                                             round(old_count * 5.0, 2)))
         return findings
 
@@ -127,6 +138,7 @@ class ECRScanner(BaseScanner):
                 for ip in ecr.get_paginator("describe_images").paginate(repositoryName=name):
                     old.extend(i for i in ip.get("imageDetails", []) if i.get("imagePushedAt", cutoff) < cutoff)
                 if old:
-                    findings.append(Finding(name, name, "ECR", region, f"{len(old)} old images",
+                    findings.append(Finding(name, name, "ECR", region,
+                                            f"{len(old)} container images not pushed in {days}+ days — stored images are billed at $0.10/GB/mo. Add a lifecycle policy to auto-expire old images",
                                             round(len(old) * 0.1, 2)))
         return findings

@@ -23,7 +23,9 @@ class GuardDutyScanner(BaseScanner):
     def scan_region(self, region):
         findings = []
         gd = get_client("guardduty", region)
-        return [Finding(did, did, "GuardDuty", region, "Disabled detector", 4.5)
+        return [Finding(did, did, "GuardDuty", region,
+                        "GuardDuty detector is disabled — you previously enabled it (and may still be billed for retained findings data). Either re-enable for security monitoring or fully delete the detector",
+                        4.5)
                 for did in gd.list_detectors().get("DetectorIds", [])
                 if gd.get_detector(DetectorId=did)["Status"] == "DISABLED"]
 
@@ -32,11 +34,16 @@ class WAFScanner(BaseScanner):
     service = "WAF"
 
     def scan_region(self, region):
+        findings = []
         waf = get_client("wafv2", region)
-        return [Finding(acl["Id"], acl["Name"], "WAF", region, "No traffic", 5.0)
-                for acl in waf.list_web_acls(Scope="REGIONAL").get("WebACLs", [])
-                if get_sum(region, "AWS/WAFV2", "AllowedRequests", "WebACL", acl["Name"], self.cw_days, self.cw_period) +
-                   get_sum(region, "AWS/WAFV2", "BlockedRequests", "WebACL", acl["Name"], self.cw_days, self.cw_period) == 0]
+        for acl in waf.list_web_acls(Scope="REGIONAL").get("WebACLs", []):
+            allowed = get_sum(region, "AWS/WAFV2", "AllowedRequests", "WebACL", acl["Name"], self.cw_days, self.cw_period)
+            blocked = get_sum(region, "AWS/WAFV2", "BlockedRequests", "WebACL", acl["Name"], self.cw_days, self.cw_period)
+            if allowed + blocked == 0:
+                findings.append(Finding(acl["Id"], acl["Name"], "WAF", region,
+                                        f"Zero requests (allowed + blocked) over {self.cw_days}d — WAF charges $5/mo per Web ACL plus per-rule fees even with no traffic. Delete if the associated resource has been removed",
+                                        5.0))
+        return findings
 
 
 class KMSScanner(BaseScanner):
@@ -50,7 +57,9 @@ class KMSScanner(BaseScanner):
                 try:
                     meta = kms.describe_key(KeyId=key["KeyId"])["KeyMetadata"]
                     if meta["KeyManager"] == "CUSTOMER" and meta["KeyState"] == "Disabled":
-                        findings.append(Finding(key["KeyId"], key["KeyId"], "KMS", region, "Disabled key", 1.0))
+                        findings.append(Finding(key["KeyId"], key["KeyId"], "KMS", region,
+                                                "Customer-managed KMS key is disabled — charges $1/mo per key even when disabled. Schedule for deletion if no longer needed (7-30 day waiting period applies)",
+                                                1.0))
                 except ClientError as e:
                     logger.debug("KMS key %s skipped: %s", key["KeyId"], e)
         return findings
@@ -69,7 +78,8 @@ class SecretsManagerScanner(BaseScanner):
                 last = secret.get("LastAccessedDate")
                 if not last or last < cutoff:
                     findings.append(Finding(secret["Name"], secret["Name"], "Secrets Manager", region,
-                                            f"Not accessed in {days}d", 0.4))
+                                            f"Secret not accessed in {days}+ days — Secrets Manager charges $0.40/mo per secret regardless of access. Delete or rotate if the associated service has been decommissioned",
+                                            0.4))
         return findings
 
 
@@ -91,7 +101,9 @@ class MacieScanner(BaseScanner):
         findings = []
         try:
             if get_client("macie2", region).get_macie_session().get("status") == "PAUSED":
-                findings.append(Finding("macie", "Macie", "Macie", region, "Paused session", 5.0))
+                findings.append(Finding("macie", "Macie", "Macie", region,
+                                        "Macie session is paused — you previously enabled it and may have residual data discovery charges. Resume for security monitoring or fully disable to stop all billing",
+                                        5.0))
         except ClientError as e:
             logger.debug("Macie not enabled in %s: %s", region, e)
         return findings
@@ -118,7 +130,9 @@ class SecurityHubScanner(BaseScanner):
             sh.describe_hub()
             findings = [Finding(std["StandardsSubscriptionArn"],
                                 std["StandardsArn"].split("/")[-1],
-                                "Security Hub", region, "Suspended standard", 2.0)
+                                "Security Hub", region,
+                                "Security standard is suspended — Security Hub still charges for findings ingested from other standards. Re-enable or fully disable Security Hub to stop charges",
+                                2.0)
                         for std in sh.get_enabled_standards().get("StandardsSubscriptions", [])
                         if std["StandardsStatus"] == "SUSPENDED"]
         except ClientError as e:
