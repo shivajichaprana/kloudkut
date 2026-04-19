@@ -12,7 +12,7 @@ from colorama import init, Fore
 try:
     from kloudkut import __version__
     from kloudkut.core import load_config, notify, save_scan, get_delta
-    from kloudkut.core.aws import get_regions, get_client, get_client_for_session, set_profile
+    from kloudkut.core.aws import get_regions, get_client, get_client_for_session, set_profile, close_all_clients
     from kloudkut.core.scanner import _cache_clear
     from kloudkut.scanners import ALL_SCANNERS, SCANNER_MAP
     from kloudkut.reports import generate_json, generate_csv, generate_html
@@ -157,6 +157,7 @@ def _run_scanners(scanners, config, regions, no_cache, session=None, label=""):
                     scanner.regions = available_regions
                     bar.set_description(f"Scanning {scanner_cls.service:<20}")
                     findings.extend(scanner.scan(use_cache=False))
+                    close_all_clients()  # free FDs between service scans
                 finally:
                     aws_module.get_client = orig
             else:
@@ -169,6 +170,7 @@ def _run_scanners(scanners, config, regions, no_cache, session=None, label=""):
                 scanner.regions = available_regions
                 bar.set_description(f"Scanning {scanner_cls.service:<20}")
                 findings.extend(scanner.scan(use_cache=not no_cache))
+                close_all_clients()  # free FDs between service scans
 
     return findings, skipped_services
 
