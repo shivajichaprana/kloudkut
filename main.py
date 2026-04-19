@@ -12,7 +12,7 @@ from colorama import init, Fore
 try:
     from kloudkut import __version__
     from kloudkut.core import load_config, notify, save_scan, get_delta
-    from kloudkut.core.aws import get_regions, get_client, get_client_for_session
+    from kloudkut.core.aws import get_regions, get_client, get_client_for_session, set_profile
     from kloudkut.core.scanner import _cache_clear
     from kloudkut.scanners import ALL_SCANNERS, SCANNER_MAP
     from kloudkut.reports import generate_json, generate_csv, generate_html
@@ -239,6 +239,9 @@ def main():
         print(f"{Fore.RED}✗ AWS credentials not found")
         print(f"{Fore.YELLOW}Configure: aws configure  OR  set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY")
         sys.exit(1)
+
+    # Propagate profile to the client factory so all scanners use it
+    set_profile(args.profile)
 
     exclude_tags = {}
     for tag in (args.exclude_tag or []):

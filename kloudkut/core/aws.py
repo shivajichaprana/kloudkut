@@ -5,10 +5,26 @@ from botocore.config import Config
 
 _BOTO_CONFIG = Config(retries={"max_attempts": 3, "mode": "adaptive"})
 
+# Module-level profile name — set by main.py before scanning starts.
+_profile: str | None = None
+
+
+def set_profile(profile: str | None) -> None:
+    """Set the AWS profile for all subsequent client creation.
+
+    Must be called before scanning starts.  Clears existing caches so new
+    clients pick up the updated credentials.
+    """
+    global _profile
+    _profile = profile
+    # Invalidate cached sessions/clients so they're recreated with the new profile
+    _session.cache_clear()
+    get_client.cache_clear()
+
 
 @lru_cache(maxsize=128)
 def _session(region: str) -> boto3.Session:
-    return boto3.Session(region_name=region)
+    return boto3.Session(profile_name=_profile, region_name=region)
 
 
 @lru_cache(maxsize=256)
