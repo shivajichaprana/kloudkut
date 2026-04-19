@@ -252,6 +252,12 @@ def main():
     # Propagate profile to the client factory so all scanners use it
     set_profile(args.profile)
 
+    # Grab account ID for report headers
+    try:
+        account_id = session.client("sts").get_caller_identity()["Account"]
+    except Exception:
+        account_id = "unknown"
+
     exclude_tags = {}
     for tag in (args.exclude_tag or []):
         if "=" in tag:
@@ -383,7 +389,7 @@ def main():
 
     if args.html:
         p = args.html if os.path.isabs(args.html) else _out(args.html)
-        html_path = generate_html(all_findings, p)
+        html_path = generate_html(all_findings, p, account_id=account_id)
         if not args.quiet:
             print(f"{Fore.GREEN}✓ HTML report: {html_path}")
 

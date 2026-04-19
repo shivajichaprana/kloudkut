@@ -55,7 +55,7 @@ def generate_csv(findings: list[Finding], output_dir: str) -> str:
     return path
 
 
-def generate_html(findings: list[Finding], path: str) -> str:
+def generate_html(findings: list[Finding], path: str, account_id: str = "") -> str:
     """Write findings to a standalone HTML report. Returns the output path."""
     from collections import defaultdict
     from html import escape as h
@@ -264,10 +264,11 @@ def generate_html(findings: list[Finding], path: str) -> str:
 <div class="container">
   <div class="header">
     <h1>KloudKut Report</h1>
-    <p class="subtitle">Generated {generated}</p>
+    <p class="subtitle">{"Account: " + h(account_id) + " &nbsp;|&nbsp; " if account_id else ""}Generated {generated}</p>
   </div>
 
   <div class="cards">
+    {"" if not account_id else '<div class="card"><div class="label">AWS Account</div><div class="value" style="font-size:1.3rem;">' + h(account_id) + '</div></div>'}
     <div class="card">
       <div class="label">Idle Resources</div>
       <div class="value blue">{len(findings)}</div>
