@@ -118,11 +118,25 @@ class BaseScanner(ABC):
                 return cached
 
         findings: list[Finding] = []
-        workers = min(len(self.regions), 10) if self.regions else 1
+        workers = min(len(self.regions), 5) if self.regions else 1
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            futures = [ex.submit(self._safe_scan, r) for r in self.regions]
-            for future in as_completed(futures, timeout=300):
-                findings.extend(future.result())
+            futures = {ex.submit(self._safe_scan, r): r for r in self.regions}
+            try:
+                for future in as_completed(futures, timeout=600):
+                    findings.extend(future.result())
+            except TimeoutError:
+                done = sum(1 for f in futures if f.done())
+                logger.warning(
+                    "%s timed out: %d/%d regions completed",
+                    self.service, done, len(futures),
+                )
+                # Collect results from completed futures
+                for future in futures:
+                    if future.done() and not future.cancelled():
+                        try:
+                            findings.extend(future.result(timeout=0))
+                        except Exception:
+                            pass
 
         findings.sort(key=lambda f: f.monthly_cost, reverse=True)
 
