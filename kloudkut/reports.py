@@ -55,7 +55,8 @@ def generate_csv(findings: list[Finding], output_dir: str) -> str:
     return path
 
 
-def generate_html(findings: list[Finding], path: str, account_id: str = "") -> str:
+def generate_html(findings: list[Finding], path: str, account_id: str = "",
+                   scan_duration: float = 0, regions_scanned: list[str] | None = None) -> str:
     """Write findings to a standalone HTML report. Returns the output path."""
     from collections import defaultdict
     from html import escape as h
@@ -65,6 +66,8 @@ def generate_html(findings: list[Finding], path: str, account_id: str = "") -> s
     monthly = round(sum(f.monthly_cost for f in findings), 2)
     annual = round(monthly * 12, 2)
     generated = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    duration_str = f"{scan_duration:.0f}s" if scan_duration else ""
+    num_regions = len(regions_scanned) if regions_scanned else 0
 
     # ── Global service breakdown table ──
     svc_totals: dict[str, float] = {}
@@ -91,6 +94,20 @@ def generate_html(findings: list[Finding], path: str, account_id: str = "") -> s
             f"<tr><td><a href=\"#region-{reg}\">{reg}</a></td><td>{count}</td><td>{svcs}</td>"
             f"<td class=\"cost\">${total:,.2f}</td>"
             f"<td class=\"cost\">${total * 12:,.2f}</td></tr>\n"
+        )
+
+    # ── Top Quick Wins ──
+    top_wins = sorted(findings, key=lambda f: f.monthly_cost, reverse=True)[:5]
+    quick_wins_rows = ""
+    for i, f in enumerate(top_wins, 1):
+        console_url = f.details.get("console_url", "")
+        name_escaped = h(f.resource_name)
+        link = f'<a href="{h(console_url)}" target="_blank">{name_escaped}</a>' if console_url else name_escaped
+        quick_wins_rows += (
+            f"<tr><td><strong>#{i}</strong></td><td>{link}</td>"
+            f"<td>{h(f.service)}</td><td>{h(f.region)}</td>"
+            f"<td class=\"cost\">${f.monthly_cost:,.2f}</td>"
+            f"<td class=\"cost\">${f.monthly_cost * 12:,.2f}</td></tr>\n"
         )
 
     # ── Group findings: region → service → [findings] ──
@@ -126,12 +143,16 @@ def generate_html(findings: list[Finding], path: str, account_id: str = "") -> s
                 console_url = f.details.get("console_url", "")
                 name_escaped = h(f.resource_name)
                 link = f'<a href="{h(console_url)}" target="_blank">{name_escaped}</a>' if console_url else name_escaped
+                # Show resource ID as secondary text if different from name
+                rid_html = f'<div class="resource-id">{h(f.resource_id)}</div>' if f.resource_id != f.resource_name else ""
                 remediation_cell = f'<code>{h(f.remediation)}</code>' if f.remediation else '<span class="na">—</span>'
+                # Cost severity class
+                sev = "high" if f.monthly_cost >= 20 else ("med" if f.monthly_cost >= 5 else "low")
                 finding_rows += (
                     f"<tr>"
-                    f"<td>{link}</td>"
+                    f"<td>{link}{rid_html}</td>"
                     f"<td class=\"reason\">{h(f.reason)}</td>"
-                    f"<td class=\"cost\">${f.monthly_cost:,.2f}</td>"
+                    f"<td class=\"cost sev-{sev}\">${f.monthly_cost:,.2f}</td>"
                     f"<td class=\"remediation\">{remediation_cell}</td>"
                     f"</tr>\n"
                 )
@@ -244,6 +265,19 @@ def generate_html(findings: list[Finding], path: str, account_id: str = "") -> s
   .findings-table {{ margin: 0; border: none; border-radius: 0; box-shadow: none; }}
   .findings-table th {{ background: #eef2f7; color: #374151; }}
 
+  /* Resource ID */
+  .resource-id {{ font-size: 0.72rem; color: #9ca3af; font-family: 'SF Mono', 'Menlo', monospace;
+                  margin-top: 2px; word-break: break-all; }}
+
+  /* Cost severity */
+  .sev-high {{ color: #dc2626; }}
+  .sev-med {{ color: #d97706; }}
+  .sev-low {{ color: #16a34a; }}
+
+  /* Responsive tables */
+  .table-wrap {{ overflow-x: auto; margin-bottom: 1.5rem; }}
+  .table-wrap table {{ margin-bottom: 0; }}
+
   /* Buttons */
   .toggle-btn {{ background: #1a1a2e; color: #fff; border: none; padding: 0.4rem 1rem;
                  border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 500; }}
@@ -258,13 +292,22 @@ def generate_html(findings: list[Finding], path: str, account_id: str = "") -> s
   /* Footer */
   .footer {{ text-align: center; color: #9ca3af; font-size: 0.8rem; margin-top: 2rem;
              padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }}
+
+  /* Print */
+  @media print {{
+    body {{ padding: 0; background: #fff; }}
+    .header {{ background: #1a1a2e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    .toggle-btn {{ display: none; }}
+    .collapsed .service-body {{ display: block !important; }}
+    .region-section, .card {{ break-inside: avoid; }}
+  }}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>KloudKut Report</h1>
-    <p class="subtitle">{"Account: " + h(account_id) + " &nbsp;|&nbsp; " if account_id else ""}Generated {generated}</p>
+    <h1>☁️ KloudKut Report</h1>
+    <p class="subtitle">{"Account: <strong>" + h(account_id) + "</strong> &nbsp;|&nbsp; " if account_id else ""}Generated {generated}{" &nbsp;|&nbsp; Scan: " + duration_str if duration_str else ""}{" &nbsp;|&nbsp; " + str(num_regions) + " regions" if num_regions else ""}</p>
   </div>
 
   <div class="cards">
@@ -291,17 +334,29 @@ def generate_html(findings: list[Finding], path: str, account_id: str = "") -> s
     </div>
   </div>
 
+  <h3 class="section-title">🏆 Top Quick Wins</h3>
+  <div class="table-wrap">
+  <table>
+    <tr><th>#</th><th>Resource</th><th>Service</th><th>Region</th><th>Monthly</th><th>Annual</th></tr>
+    {quick_wins_rows}
+  </table>
+  </div>
+
   <h3 class="section-title">Savings by Region</h3>
+  <div class="table-wrap">
   <table>
     <tr><th>Region</th><th>Findings</th><th>Services</th><th>Monthly</th><th>Annual</th></tr>
     {region_breakdown_rows}
   </table>
+  </div>
 
   <h3 class="section-title">Savings by Service</h3>
+  <div class="table-wrap">
   <table>
     <tr><th>Service</th><th>Resources</th><th>Monthly</th><th>Annual</th></tr>
     {breakdown_rows}
   </table>
+  </div>
 
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
     <h3 class="section-title" style="border:none; margin-bottom:0;">Findings by Region &amp; Service</h3>

@@ -8,7 +8,7 @@ class EIPScanner(BaseScanner):
 
     def scan_region(self, region):
         return [Finding(addr["AllocationId"], addr.get("PublicIp", ""), "EIP", region,
-                        f"Elastic IP {addr.get('PublicIp', '')} not associated with any running instance — AWS charges $0.005/hr ($3.60/mo) for idle EIPs. Release if no longer needed",
+                        f"Elastic IP {addr.get('PublicIp', '')} not associated with any running instance — AWS charges $0.005/hr ($3.65/mo) for idle EIPs. Release if no longer needed",
                         EIP_MONTHLY,
                         remediation=f"aws ec2 release-address --allocation-id {addr['AllocationId']} --region {region}")
                 for addr in get_client("ec2", region).describe_addresses().get("Addresses", [])

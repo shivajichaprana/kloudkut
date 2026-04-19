@@ -48,6 +48,12 @@ class S3Scanner(BaseScanner):
 class EBSScanner(BaseScanner):
     service = "EBS"
 
+    # EBS per-GB/mo prices (us-east-1) — verified against AWS docs
+    _EBS_GB_MONTHLY = {
+        "gp2": 0.10, "gp3": 0.08, "io1": 0.125, "io2": 0.125,
+        "st1": 0.045, "sc1": 0.015, "standard": 0.05,
+    }
+
     def scan_region(self, region):
         findings = []
         ec2 = get_client("ec2", region)
@@ -55,9 +61,11 @@ class EBSScanner(BaseScanner):
             for vol in page.get("Volumes", []):
                 name = next((t["Value"] for t in vol.get("Tags", []) if t["Key"] == "Name"), vol["VolumeId"])
                 vtype = vol.get("VolumeType", "gp2")
+                gb_price = self._EBS_GB_MONTHLY.get(vtype, 0.10)
+                monthly = round(vol["Size"] * gb_price, 2)
                 findings.append(Finding(vol["VolumeId"], name, "EBS", region,
-                                        f"Unattached {vtype} volume ({vol['Size']} GB) — not connected to any instance but billed at full storage rate. Snapshot & delete if no longer needed",
-                                        round(vol["Size"] * 0.10, 2),
+                                        f"Unattached {vtype} volume ({vol['Size']} GB) — not connected to any instance but billed ${gb_price}/GB/mo. Snapshot & delete if no longer needed",
+                                        monthly,
                                         remediation=f"aws ec2 delete-volume --volume-id {vol['VolumeId']} --region {region}"))
         return findings
 

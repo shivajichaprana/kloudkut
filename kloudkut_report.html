@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KloudKut Report</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #f0f2f5; color: #1a1a2e; padding: 2rem; }
+  .container { max-width: 1400px; margin: 0 auto; }
+
+  /* Header */
+  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+             color: #fff; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; }
+  .header h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+  .header .subtitle { color: #94a3b8; margin: 0; }
+
+  /* Summary cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem; margin-bottom: 2rem; }
+  .card { background: #fff; border-radius: 10px; padding: 1.5rem;
+           box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+  .card .label { font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+  .card .value { font-size: 2rem; font-weight: 700; margin-top: 0.25rem; }
+  .card .value.green { color: #16a34a; }
+  .card .value.blue { color: #2563eb; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; background: #fff;
+           border-radius: 10px; overflow: hidden;
+           box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem;
+           border: 1px solid #e5e7eb; }
+  th { background: #1a1a2e; color: #fff; text-align: left; padding: 0.75rem 1rem;
+       font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { padding: 0.65rem 1rem; border-bottom: 1px solid #f1f3f5; font-size: 0.88rem; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #f8fafc; }
+  .cost { text-align: right; font-family: 'SF Mono', 'Menlo', monospace; font-weight: 600; }
+  .reason { max-width: 450px; line-height: 1.45; color: #374151; }
+  .remediation code { font-size: 0.78rem; }
+  .na { color: #9ca3af; }
+
+  /* Section headings */
+  h2 { font-size: 1.3rem; margin: 0; }
+  .section-title { font-size: 1.2rem; color: #1a1a2e; margin: 2rem 0 1rem;
+                    padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; }
+
+  /* Region sections */
+  .region-section { background: #fff; border-radius: 12px; padding: 1.5rem;
+                     margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                     border: 1px solid #e5e7eb; }
+  .region-header { display: flex; justify-content: space-between; align-items: center;
+                    margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+  .region-header h2 { margin: 0; font-size: 1.3rem; }
+  .region-stats { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .region-badge { background: #f1f3f5; color: #374151; padding: 0.3rem 0.75rem;
+                   border-radius: 20px; font-size: 0.8rem; font-weight: 500; }
+  .region-badge.cost { background: #dcfce7; color: #166534; font-weight: 700;
+                        font-family: 'SF Mono', 'Menlo', monospace; }
+
+  /* Service blocks */
+  .service-block { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 0.75rem;
+                    overflow: hidden; }
+  .service-header { display: flex; align-items: center; padding: 0.75rem 1rem;
+                     background: #f8fafc; cursor: pointer; user-select: none;
+                     border-bottom: 1px solid #e5e7eb; gap: 0.75rem; }
+  .service-header:hover { background: #f1f5f9; }
+  .toggle-icon { font-size: 0.7rem; color: #6b7280; transition: transform 0.2s; }
+  .collapsed .toggle-icon { transform: rotate(-90deg); }
+  .service-name { font-weight: 600; font-size: 0.95rem; }
+  .service-meta { color: #6b7280; font-size: 0.82rem; }
+  .service-cost { margin-left: auto; font-weight: 700; color: #16a34a;
+                   font-family: 'SF Mono', 'Menlo', monospace; font-size: 0.9rem; }
+  .collapsed .service-body { display: none; }
+  .service-body { padding: 0; }
+  .findings-table { margin: 0; border: none; border-radius: 0; box-shadow: none; }
+  .findings-table th { background: #eef2f7; color: #374151; }
+
+  /* Buttons */
+  .toggle-btn { background: #1a1a2e; color: #fff; border: none; padding: 0.4rem 1rem;
+                 border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 500; }
+  .toggle-btn:hover { background: #16213e; }
+
+  /* Code & links */
+  code { background: #f1f3f5; padding: 2px 6px; border-radius: 4px; font-size: 0.78rem;
+          word-break: break-all; }
+  a { color: #2563eb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Footer */
+  .footer { text-align: center; color: #9ca3af; font-size: 0.8rem; margin-top: 2rem;
+             padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>KloudKut Report</h1>
+    <p class="subtitle">Account: default &nbsp;|&nbsp; Generated 2026-04-19 15:01 UTC</p>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">AWS Account</div><div class="value" style="font-size:1.3rem;">default</div></div>
+    <div class="card">
+      <div class="label">Idle Resources</div>
+      <div class="value blue">105</div>
+    </div>
+    <div class="card">
+      <div class="label">Monthly Savings</div>
+      <div class="value green">$550.00</div>
+    </div>
+    <div class="card">
+      <div class="label">Annual Savings</div>
+      <div class="value green">$6,600.00</div>
+    </div>
+    <div class="card">
+      <div class="label">Regions Affected</div>
+      <div class="value blue">18</div>
+    </div>
+    <div class="card">
+      <div class="label">Services Affected</div>
+      <div class="value blue">17</div>
+    </div>
+  </div>
+
+  <h3 class="section-title">Savings by Region</h3>
+  <table>
+    <tr><th>Region</th><th>Findings</th><th>Services</th><th>Monthly</th><th>Annual</th></tr>
+    <tr><td><a href="#region-us-east-1">us-east-1</a></td><td>49</td><td>12</td><td class="cost">$323.56</td><td class="cost">$3,882.72</td></tr>
+<tr><td><a href="#region-ap-south-1">ap-south-1</a></td><td>23</td><td>7</td><td class="cost">$61.83</td><td class="cost">$741.96</td></tr>
+<tr><td><a href="#region-us-west-1">us-west-1</a></td><td>8</td><td>5</td><td class="cost">$52.91</td><td class="cost">$634.92</td></tr>
+<tr><td><a href="#region-us-east-2">us-east-2</a></td><td>4</td><td>3</td><td class="cost">$40.00</td><td class="cost">$480.00</td></tr>
+<tr><td><a href="#region-us-west-2">us-west-2</a></td><td>8</td><td>5</td><td class="cost">$11.20</td><td class="cost">$134.40</td></tr>
+<tr><td><a href="#region-eu-west-2">eu-west-2</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-eu-west-3">eu-west-3</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-eu-west-1">eu-west-1</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-eu-north-1">eu-north-1</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-ap-northeast-3">ap-northeast-3</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-ap-northeast-2">ap-northeast-2</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-ap-northeast-1">ap-northeast-1</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-ap-southeast-1">ap-southeast-1</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-ca-central-1">ca-central-1</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-sa-east-1">sa-east-1</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-eu-central-1">eu-central-1</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-ap-southeast-2">ap-southeast-2</a></td><td>1</td><td>1</td><td class="cost">$5.00</td><td class="cost">$60.00</td></tr>
+<tr><td><a href="#region-Global">Global</a></td><td>1</td><td>1</td><td class="cost">$0.50</td><td class="cost">$6.00</td></tr>
+
+  </table>
+
+  <h3 class="section-title">Savings by Service</h3>
+  <table>
+    <tr><th>Service</th><th>Resources</th><th>Monthly</th><th>Annual</th></tr>
+    <tr><td>EC2</td><td>6</td><td class="cost">$141.32</td><td class="cost">$1,695.84</td></tr>
+<tr><td>Athena</td><td>17</td><td class="cost">$85.00</td><td class="cost">$1,020.00</td></tr>
+<tr><td>Lambda</td><td>15</td><td class="cost">$75.00</td><td class="cost">$900.00</td></tr>
+<tr><td>S3</td><td>15</td><td class="cost">$63.00</td><td class="cost">$756.00</td></tr>
+<tr><td>CloudWatch Logs</td><td>32</td><td class="cost">$61.69</td><td class="cost">$740.28</td></tr>
+<tr><td>DynamoDB</td><td>2</td><td class="cost">$50.00</td><td class="cost">$600.00</td></tr>
+<tr><td>NAT Gateway</td><td>1</td><td class="cost">$32.85</td><td class="cost">$394.20</td></tr>
+<tr><td>VPC Endpoint</td><td>3</td><td class="cost">$22.50</td><td class="cost">$270.00</td></tr>
+<tr><td>API Gateway</td><td>2</td><td class="cost">$7.00</td><td class="cost">$84.00</td></tr>
+<tr><td>EIP</td><td>1</td><td class="cost">$3.60</td><td class="cost">$43.20</td></tr>
+<tr><td>Reserved Instances</td><td>1</td><td class="cost">$3.04</td><td class="cost">$36.48</td></tr>
+<tr><td>CloudFormation</td><td>3</td><td class="cost">$3.00</td><td class="cost">$36.00</td></tr>
+<tr><td>Route53</td><td>1</td><td class="cost">$0.50</td><td class="cost">$6.00</td></tr>
+<tr><td>SNS</td><td>1</td><td class="cost">$0.50</td><td class="cost">$6.00</td></tr>
+<tr><td>EventBridge</td><td>1</td><td class="cost">$0.50</td><td class="cost">$6.00</td></tr>
+<tr><td>CloudWatch Alarm</td><td>3</td><td class="cost">$0.30</td><td class="cost">$3.60</td></tr>
+<tr><td>ECR</td><td>1</td><td class="cost">$0.20</td><td class="cost">$2.40</td></tr>
+
+  </table>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+    <h3 class="section-title" style="border:none; margin-bottom:0;">Findings by Region &amp; Service</h3>
+    <div style="display:flex; gap:0.5rem;">
+      <button class="toggle-btn" onclick="document.querySelectorAll('.service-block').forEach(b=>b.classList.remove('collapsed'))">Expand All</button>
+      <button class="toggle-btn" onclick="document.querySelectorAll('.service-block').forEach(b=>b.classList.add('collapsed'))">Collapse All</button>
+    </div>
+  </div>
+  
+  <div class="region-section" id="region-us-east-1">
+    <div class="region-header">
+      <h2>📍 us-east-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">49 findings</span>
+        <span class="region-badge">12 services</span>
+        <span class="region-badge cost">$323.56/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">EC2</span>
+          <span class="service-meta">6 findings</span>
+          <span class="service-cost">$141.32/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td><a href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:instanceId=i-02c14999f97f9ceca" target="_blank">test-rsync</a></td><td class="reason">Stopped instance (t2.nano) — still incurring EBS storage charges. Terminate if no longer needed, or snapshot &amp; delete volumes</td><td class="cost">$73.00</td><td class="remediation"><code>aws ec2 terminate-instances --instance-ids i-02c14999f97f9ceca --region us-east-1</code></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:instanceId=i-0123a834f239aed66" target="_blank">ad-server-poc</a></td><td class="reason">Stopped instance (t3.medium) — still incurring EBS storage charges. Terminate if no longer needed, or snapshot &amp; delete volumes</td><td class="cost">$30.37</td><td class="remediation"><code>aws ec2 terminate-instances --instance-ids i-0123a834f239aed66 --region us-east-1</code></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:instanceId=i-00ee3ab5e397ecc12" target="_blank">witness-server-poc</a></td><td class="reason">Stopped instance (t3.small) — still incurring EBS storage charges. Terminate if no longer needed, or snapshot &amp; delete volumes</td><td class="cost">$15.18</td><td class="remediation"><code>aws ec2 terminate-instances --instance-ids i-00ee3ab5e397ecc12 --region us-east-1</code></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:instanceId=i-0c25b9440b047b4f6" target="_blank">test-sns-alert-slack</a></td><td class="reason">Stopped instance (t3.micro) — still incurring EBS storage charges. Terminate if no longer needed, or snapshot &amp; delete volumes</td><td class="cost">$7.59</td><td class="remediation"><code>aws ec2 terminate-instances --instance-ids i-0c25b9440b047b4f6 --region us-east-1</code></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:instanceId=i-020d19af99e8ddfc6" target="_blank">alert-testing</a></td><td class="reason">Stopped instance (t3.micro) — still incurring EBS storage charges. Terminate if no longer needed, or snapshot &amp; delete volumes</td><td class="cost">$7.59</td><td class="remediation"><code>aws ec2 terminate-instances --instance-ids i-020d19af99e8ddfc6 --region us-east-1</code></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:instanceId=i-0ab568a64cd5d3232" target="_blank">test-alert-adhul</a></td><td class="reason">Stopped instance (t3.micro) — still incurring EBS storage charges. Terminate if no longer needed, or snapshot &amp; delete volumes</td><td class="cost">$7.59</td><td class="remediation"><code>aws ec2 terminate-instances --instance-ids i-0ab568a64cd5d3232 --region us-east-1</code></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Lambda</span>
+          <span class="service-meta">11 findings</span>
+          <span class="service-cost">$55.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/blinkTestRAG" target="_blank">blinkTestRAG</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/startBlinkGraphJob" target="_blank">startBlinkGraphJob</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/getBlinkGraphResult" target="_blank">getBlinkGraphResult</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/blinkHello" target="_blank">blinkHello</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/blinkExtractBlinkGraph" target="_blank">blinkExtractBlinkGraph</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/kb-sync-lambda" target="_blank">kb-sync-lambda</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/getBlinkGraphJobStatus" target="_blank">getBlinkGraphJobStatus</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/checkBlinkGraphJobStatus" target="_blank">checkBlinkGraphJobStatus</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/file-upload-lambda" target="_blank">file-upload-lambda</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/blinkSyncVectorDB" target="_blank">blinkSyncVectorDB</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/tgixBlinkGetMappingJson" target="_blank">tgixBlinkGetMappingJson</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">NAT Gateway</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$32.85/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>nat-0a2d4bec322102a77</td><td class="reason">Near-zero traffic over 14d (0 bytes out) — NAT Gateway charges $0.045/hr ($32.85/mo) plus data processing fees even when idle. Delete if private subnets no longer need internet access</td><td class="cost">$32.85</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">S3</span>
+          <span class="service-meta">6 findings</span>
+          <span class="service-cost">$26.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>blinkgraph-results-296843147625</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://blinkgraph-results-296843147625 --force</code></td></tr>
+<tr><td>blinkgraph-uploads-1750408736-28d890ed</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://blinkgraph-uploads-1750408736-28d890ed --force</code></td></tr>
+<tr><td>cf-templates-btfdyy9zr6f7-us-east-1</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://cf-templates-btfdyy9zr6f7-us-east-1 --force</code></td></tr>
+<tr><td>tgix-ai-blink-bucket-0</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://tgix-ai-blink-bucket-0 --force</code></td></tr>
+<tr><td>tgix-ai-blink-ui</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://tgix-ai-blink-ui --force</code></td></tr>
+<tr><td>blink-frontend-demo-2025</td><td class="reason">Empty bucket with zero objects — still incurs request charges and may have lifecycle rules or replication adding overhead. Delete if unused</td><td class="cost">$1.00</td><td class="remediation"><code>aws s3 rb s3://blink-frontend-demo-2025 --force</code></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">DynamoDB</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$25.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>BlinkGraphJobTracker</td><td class="reason">Near-zero usage over 14d (reads: 0, writes: 0) — provisioned capacity or on-demand minimum charges apply even with no traffic. Delete table or switch to on-demand if rarely used</td><td class="cost">$25.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">VPC Endpoint</span>
+          <span class="service-meta">3 findings</span>
+          <span class="service-cost">$22.50/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>com.amazonaws.us-east-1.ssm</td><td class="reason">Zero bytes processed over 14d — Interface VPC Endpoints charge ~$7.50/mo per AZ plus data processing fees even with no traffic. Delete if the connected service is no longer used from this VPC</td><td class="cost">$7.50</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>com.amazonaws.us-east-1.ec2messages</td><td class="reason">Zero bytes processed over 14d — Interface VPC Endpoints charge ~$7.50/mo per AZ plus data processing fees even with no traffic. Delete if the connected service is no longer used from this VPC</td><td class="cost">$7.50</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>com.amazonaws.us-east-1.ssmmessages</td><td class="reason">Zero bytes processed over 14d — Interface VPC Endpoints charge ~$7.50/mo per AZ plus data processing fees even with no traffic. Delete if the connected service is no longer used from this VPC</td><td class="cost">$7.50</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">API Gateway</span>
+          <span class="service-meta">2 findings</span>
+          <span class="service-cost">$7.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>tgix-ai-blink-api</td><td class="reason">Only 0 API calls over 14d — REST API exists but receives almost no traffic. Delete if the backend has been decommissioned</td><td class="cost">$3.50</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>BlinkSynapticUI-API</td><td class="reason">Only 0 API calls over 14d — REST API exists but receives almost no traffic. Delete if the backend has been decommissioned</td><td class="cost">$3.50</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">EIP</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$3.60/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>23.23.113.155</td><td class="reason">Elastic IP 23.23.113.155 not associated with any running instance — AWS charges $0.005/hr ($3.60/mo) for idle EIPs. Release if no longer needed</td><td class="cost">$3.60</td><td class="remediation"><code>aws ec2 release-address --allocation-id eipalloc-05f4c54199cff5b82 --region us-east-1</code></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Reserved Instances</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$3.04/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td><a href="https://us-east-1.console.aws.amazon.com/ec2/v2/home?region=us-east-1#ReservedInstances:" target="_blank">test-sns-alert</a></td><td class="reason">Running On-Demand for 234d (t3.micro) with no Reserved Instance or Savings Plan coverage — a 1-year RI would save ~40%. Consider purchasing RI or Compute Savings Plan</td><td class="cost">$3.04</td><td class="remediation"><code>aws ec2 purchase-reserved-instances-offering --instance-type t3.micro --region us-east-1</code></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">CloudFormation</span>
+          <span class="service-meta">2 findings</span>
+          <span class="service-cost">$2.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>eksctl-nick-istio-use1-cluster</td><td class="reason">Stack in failed state (DELETE_FAILED) — failed stacks may leave behind provisioned resources (EC2, RDS, etc.) still incurring charges. Investigate and delete the stack to clean up orphaned resources</td><td class="cost">$1.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>eksctl-istio-eks-tgix2-cluster</td><td class="reason">Stack in failed state (DELETE_FAILED) — failed stacks may leave behind provisioned resources (EC2, RDS, etc.) still incurring charges. Investigate and delete the stack to clean up orphaned resources</td><td class="cost">$1.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">CloudWatch Logs</span>
+          <span class="service-meta">14 findings</span>
+          <span class="service-cost">$0.25/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>/aws/chatbot/aws-alert</td><td class="reason">No log events ingested in 90+ days (2.4 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.07</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/chatbot/aws-alert-slack</td><td class="reason">No log events ingested in 90+ days (2.5 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.07</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/checkBlinkGraphJobStatus</td><td class="reason">No log events ingested in 90+ days (1.6 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.05</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/chatbot/test-aws-alert</td><td class="reason">No log events ingested in 90+ days (0.8 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.02</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/blinkExtractBlinkGraph</td><td class="reason">No log events ingested in 90+ days (0.7 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.02</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/startBlinkGraphJob</td><td class="reason">No log events ingested in 90+ days (0.5 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.02</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/chatbot/Uptime-alert</td><td class="reason">No log events ingested in 90+ days (0.1 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/blinkHello</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/blinkSyncVectorDB</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/blinkTestRAG</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/file-upload-lambda</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/kb-sync-lambda</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/vendedlogs/bedrock/knowledge-base/APPLICATION_LOGS/HSCRCGO5TC</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/vendedlogs/events/event-bus/tgix-central-bus</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-ap-south-1">
+    <div class="region-header">
+      <h2>📍 ap-south-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">23 findings</span>
+        <span class="region-badge">7 services</span>
+        <span class="region-badge cost">$61.83/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">CloudWatch Logs</span>
+          <span class="service-meta">11 findings</span>
+          <span class="service-cost">$29.53/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>/aws/lambda/cwsyn-striim-prod-stag-upti-97376fce-6528-4f09-a15a-cfc15f6548c8</td><td class="reason">No log events ingested in 90+ days (434.7 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$13.04</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-prod-connector-9cd1b19a-f1b2-4f67-b141-be4932266889</td><td class="reason">No log events ingested in 90+ days (257.9 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$7.74</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-prod-main-upti-f3a6c54b-d721-41f9-9b87-9dc5eda1fc74</td><td class="reason">No log events ingested in 90+ days (257.3 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$7.72</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-main-page-chec-6a2e2183-fbaf-4df6-b1fe-47282ff-fire</td><td class="reason">No log events ingested in 90+ days (15.9 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.48</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-main-page-chec-6a2e2183-fbaf-4df6-b1fe-47282ff9ed5e</td><td class="reason">No log events ingested in 90+ days (13.2 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.40</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-main-website-9ace4db1-d87c-45c0-8e95-9848441-fire</td><td class="reason">No log events ingested in 90+ days (3.8 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.12</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-main-website-9ace4db1-d87c-45c0-8e95-984844179f67</td><td class="reason">No log events ingested in 90+ days (1.2 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.03</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-prod-connector-9cd1b19a-f1b2-4f67-b141-be49322-fire</td><td class="reason">No log events ingested in 90+ days (0.1 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-prod-main-upti-f3a6c54b-d721-41f9-9b87-9dc5eda-fire</td><td class="reason">No log events ingested in 90+ days (0.1 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-staging-uptime-535584cf-7043-4bb8-832c-53e343990056</td><td class="reason">No log events ingested in 90+ days (0.1 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/vendedlogs/events/event-bus/tgix-central-bus</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">S3</span>
+          <span class="service-meta">4 findings</span>
+          <span class="service-cost">$16.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>cross-accout-access-test-temp</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://cross-accout-access-test-temp --force</code></td></tr>
+<tr><td>cw-syn-results-296843147625-ap-south-1</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://cw-syn-results-296843147625-ap-south-1 --force</code></td></tr>
+<tr><td>s3-copy-test-source-can-be-deleted</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://s3-copy-test-source-can-be-deleted --force</code></td></tr>
+<tr><td>replication-test-destination-bucket-adh</td><td class="reason">Empty bucket with zero objects — still incurs request charges and may have lifecycle rules or replication adding overhead. Delete if unused</td><td class="cost">$1.00</td><td class="remediation"><code>aws s3 rb s3://replication-test-destination-bucket-adh --force</code></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Lambda</span>
+          <span class="service-meta">2 findings</span>
+          <span class="service-cost">$10.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td><a href="https://ap-south-1.console.aws.amazon.com/lambda/home?region=ap-south-1#/functions/cwsyn-striim-prod-main-upti-f3a6c54b-d721-41f9-9b87-9dc5eda-fire" target="_blank">cwsyn-striim-prod-main-upti-f3a6c54b-d721-41f9-9b87-9dc5eda-fire</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td><a href="https://ap-south-1.console.aws.amazon.com/lambda/home?region=ap-south-1#/functions/cwsyn-striim-prod-connector-9cd1b19a-f1b2-4f67-b141-be49322-fire" target="_blank">cwsyn-striim-prod-connector-9cd1b19a-f1b2-4f67-b141-be49322-fire</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">SNS</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$0.50/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>tgix-alarms-striim</td><td class="reason">Zero messages published over 14d — topic exists but no publisher is sending to it. Delete if subscribers have been removed or migrated</td><td class="cost">$0.50</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">EventBridge</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$0.50/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>Werbsite-alert</td><td class="reason">EventBridge rule is disabled — while disabled rules don&#x27;t trigger, they add clutter and may reference Lambda/SNS targets that are also unused. Delete if the automation is no longer needed</td><td class="cost">$0.50</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">CloudWatch Alarm</span>
+          <span class="service-meta">3 findings</span>
+          <span class="service-cost">$0.30/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>striim-prod-connectors-uptime-cloudwatch</td><td class="reason">Alarm stuck in INSUFFICIENT_DATA — the monitored metric is not reporting, likely because the resource was deleted. Each alarm costs $0.10/mo. Delete orphaned alarms</td><td class="cost">$0.10</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>striim-prod-main-uptime-cloudwatch</td><td class="reason">Alarm stuck in INSUFFICIENT_DATA — the monitored metric is not reporting, likely because the resource was deleted. Each alarm costs $0.10/mo. Delete orphaned alarms</td><td class="cost">$0.10</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>striim-prod-stag-uptime-cloudwatch</td><td class="reason">Alarm stuck in INSUFFICIENT_DATA — the monitored metric is not reporting, likely because the resource was deleted. Each alarm costs $0.10/mo. Delete orphaned alarms</td><td class="cost">$0.10</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-us-west-1">
+    <div class="region-header">
+      <h2>📍 us-west-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">8 findings</span>
+        <span class="region-badge">5 services</span>
+        <span class="region-badge cost">$52.91/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">CloudWatch Logs</span>
+          <span class="service-meta">3 findings</span>
+          <span class="service-cost">$31.91/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>/aws/lambda/cwsyn-striim-admin-cachebus-fc7f53e9-797c-44d3-9358-6c77264db2e3</td><td class="reason">No log events ingested in 90+ days (532.2 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$15.97</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-cachebuster-ca-15347935-2333-46cd-be0c-bdc33d650223</td><td class="reason">No log events ingested in 90+ days (531.4 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$15.94</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lambda/cwsyn-striim-admin-cachebus-fc7f53e9-797c-44d3-9358-6c77264-fire</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">S3</span>
+          <span class="service-meta">2 findings</span>
+          <span class="service-cost">$10.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>cf-templates-btfdyy9zr6f7-us-west-1</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://cf-templates-btfdyy9zr6f7-us-west-1 --force</code></td></tr>
+<tr><td>cw-syn-results-296843147625-us-west-1</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://cw-syn-results-296843147625-us-west-1 --force</code></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Lambda</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td><a href="https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/cwsyn-striim-admin-cachebus-fc7f53e9-797c-44d3-9358-6c77264-fire" target="_blank">cwsyn-striim-admin-cachebus-fc7f53e9-797c-44d3-9358-6c77264-fire</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">CloudFormation</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$1.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>eksctl-nick-istio-usw1-cluster</td><td class="reason">Stack in failed state (DELETE_FAILED) — failed stacks may leave behind provisioned resources (EC2, RDS, etc.) still incurring charges. Investigate and delete the stack to clean up orphaned resources</td><td class="cost">$1.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-us-east-2">
+    <div class="region-header">
+      <h2>📍 us-east-2</h2>
+      <div class="region-stats">
+        <span class="region-badge">4 findings</span>
+        <span class="region-badge">3 services</span>
+        <span class="region-badge cost">$40.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">DynamoDB</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$25.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>terraform-state-296843147625-us-east-2</td><td class="reason">Near-zero usage over 14d (reads: 0, writes: 0) — provisioned capacity or on-demand minimum charges apply even with no traffic. Delete table or switch to on-demand if rarely used</td><td class="cost">$25.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">S3</span>
+          <span class="service-meta">2 findings</span>
+          <span class="service-cost">$10.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>cf-templates-btfdyy9zr6f7-us-east-2</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://cf-templates-btfdyy9zr6f7-us-east-2 --force</code></td></tr>
+<tr><td>terraform-state-296843147625-us-east-2</td><td class="reason">No objects modified in 90+ days — storage charges continue for all existing objects. Consider archiving to Glacier, adding lifecycle rules, or deleting stale data</td><td class="cost">$5.00</td><td class="remediation"><code>aws s3 rb s3://terraform-state-296843147625-us-east-2 --force</code></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-us-west-2">
+    <div class="region-header">
+      <h2>📍 us-west-2</h2>
+      <div class="region-stats">
+        <span class="region-badge">8 findings</span>
+        <span class="region-badge">5 services</span>
+        <span class="region-badge cost">$11.20/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Lambda</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td><a href="https://us-west-2.console.aws.amazon.com/lambda/home?region=us-west-2#/functions/BookCabHandler" target="_blank">BookCabHandler</a></td><td class="reason">Zero invocations in 30d — function is deployed but never called. Associated CloudWatch Logs and provisioned concurrency (if any) still incur charges. Delete if obsolete</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">S3</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$1.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>amazon-connect-72672f7f1cd7</td><td class="reason">Empty bucket with zero objects — still incurs request charges and may have lifecycle rules or replication adding overhead. Delete if unused</td><td class="cost">$1.00</td><td class="remediation"><code>aws s3 rb s3://amazon-connect-72672f7f1cd7 --force</code></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">ECR</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$0.20/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>test/tgix-1</td><td class="reason">2 container images not pushed in 180+ days — stored images are billed at $0.10/GB/mo. Add a lifecycle policy to auto-expire old images</td><td class="cost">$0.20</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">CloudWatch Logs</span>
+          <span class="service-meta">4 findings</span>
+          <span class="service-cost">$0.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>/aws/connect/tgix-test1</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lex/1TTST82AR6</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lex/GP7I3YTGZA</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+<tr><td>/aws/lex/Q6NODR3ELX</td><td class="reason">No log events ingested in 90+ days (0.0 MB stored) — storage charges $0.03/GB/mo for retained logs. Set a retention policy or delete if the source service has been removed</td><td class="cost">$0.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-eu-west-2">
+    <div class="region-header">
+      <h2>📍 eu-west-2</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-eu-west-3">
+    <div class="region-header">
+      <h2>📍 eu-west-3</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-eu-west-1">
+    <div class="region-header">
+      <h2>📍 eu-west-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-eu-north-1">
+    <div class="region-header">
+      <h2>📍 eu-north-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-ap-northeast-3">
+    <div class="region-header">
+      <h2>📍 ap-northeast-3</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-ap-northeast-2">
+    <div class="region-header">
+      <h2>📍 ap-northeast-2</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-ap-northeast-1">
+    <div class="region-header">
+      <h2>📍 ap-northeast-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-ap-southeast-1">
+    <div class="region-header">
+      <h2>📍 ap-southeast-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-ca-central-1">
+    <div class="region-header">
+      <h2>📍 ca-central-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-sa-east-1">
+    <div class="region-header">
+      <h2>📍 sa-east-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-eu-central-1">
+    <div class="region-header">
+      <h2>📍 eu-central-1</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-ap-southeast-2">
+    <div class="region-header">
+      <h2>📍 ap-southeast-2</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$5.00/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Athena</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$5.00/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>primary</td><td class="reason">Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned</td><td class="cost">$5.00</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+  <div class="region-section" id="region-Global">
+    <div class="region-header">
+      <h2>📍 Global</h2>
+      <div class="region-stats">
+        <span class="region-badge">1 finding</span>
+        <span class="region-badge">1 service</span>
+        <span class="region-badge cost">$0.50/mo</span>
+      </div>
+    </div>
+    
+      <div class="service-block">
+        <div class="service-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle-icon">▼</span>
+          <span class="service-name">Route53</span>
+          <span class="service-meta">1 finding</span>
+          <span class="service-cost">$0.50/mo</span>
+        </div>
+        <div class="service-body">
+          <table class="findings-table">
+            <tr><th>Resource</th><th>Reason</th><th>Monthly Cost</th><th>Remediation</th></tr>
+            <tr><td>test.tgix.com.</td><td class="reason">Zero DNS queries over 14d — hosted zone charges $0.50/mo regardless of traffic. Delete if domain is no longer in use or DNS has been migrated elsewhere</td><td class="cost">$0.50</td><td class="remediation"><span class="na">—</span></td></tr>
+
+          </table>
+        </div>
+      </div>
+  </div>
+
+  <p class="footer">KloudKut v5.1.0 &mdash; AWS Cost Optimization</p>
+</div>
+
+<script>
+// Expand/collapse all
+document.querySelectorAll('.service-header').forEach(h => {
+  h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+});
+</script>
+</body>
+</html>

@@ -332,8 +332,8 @@ def main():
 
     all_skipped = {}  # {service: [regions]} across all accounts
     try:
-        for account_id, acct_session in accounts_to_scan:
-            label = f"[{account_id}]" if len(accounts_to_scan) > 1 else ""
+        for acct_label, acct_session in accounts_to_scan:
+            label = f"[{acct_label}]" if len(accounts_to_scan) > 1 else ""
             pending = [s for s in scanners if s.service not in scanned_services or acct_session]
             findings, skipped = _run_scanners(pending, config, regions, args.no_cache, acct_session, label)
             all_findings.extend(findings)
@@ -389,7 +389,10 @@ def main():
 
     if args.html:
         p = args.html if os.path.isabs(args.html) else _out(args.html)
-        html_path = generate_html(all_findings, p, account_id=account_id)
+        html_path = generate_html(all_findings, p,
+                                  account_id=account_id,
+                                  scan_duration=elapsed,
+                                  regions_scanned=regions)
         if not args.quiet:
             print(f"{Fore.GREEN}✓ HTML report: {html_path}")
 

@@ -2,6 +2,8 @@
 
 # EC2 hourly on-demand prices (us-east-1, Linux)
 EC2_HOURLY: dict[str, float] = {
+    "t2.nano": 0.0058, "t2.micro": 0.0116, "t2.small": 0.023, "t2.medium": 0.0464,
+    "t2.large": 0.0928, "t2.xlarge": 0.1856, "t2.2xlarge": 0.3712,
     "t3.nano": 0.0052, "t3.micro": 0.0104, "t3.small": 0.0208, "t3.medium": 0.0416,
     "t3.large": 0.0832, "t3.xlarge": 0.1664, "t3.2xlarge": 0.3328,
     "t3a.nano": 0.0047, "t3a.micro": 0.0094, "t3a.small": 0.0188, "t3a.medium": 0.0376,
@@ -57,7 +59,7 @@ ELASTICACHE_HOURLY: dict[str, float] = {
     "cache.t4g.micro": 0.016, "cache.t4g.small": 0.032, "cache.t4g.medium": 0.065,
     "cache.m5.large": 0.124, "cache.m5.xlarge": 0.248, "cache.m5.2xlarge": 0.497,
     "cache.m6g.large": 0.113, "cache.m6g.xlarge": 0.226, "cache.m6g.2xlarge": 0.452,
-    "cache.r5.large": 0.166, "cache.r5.xlarge": 0.332, "cache.r5.2xlarge": 0.665,
+    "cache.r5.large": 0.216, "cache.r5.xlarge": 0.432, "cache.r5.2xlarge": 0.864,
     "cache.r6g.large": 0.149, "cache.r6g.xlarge": 0.298, "cache.r6g.2xlarge": 0.597,
 }
 
@@ -95,7 +97,7 @@ EKS_CLUSTER_HOURLY = 0.10  # $0.10/hr per cluster
 NAT_GATEWAY_HOURLY = 0.045  # $0.045/hr
 
 # EIP unassociated monthly cost
-EIP_MONTHLY = 3.60  # $0.005/hr × 730
+EIP_MONTHLY = 3.65  # $0.005/hr × 730
 
 # DocumentDB instance hourly prices (us-east-1)
 DOCUMENTDB_HOURLY: dict[str, float] = {
