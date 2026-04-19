@@ -10,6 +10,16 @@ logger = logging.getLogger(__name__)
 class GuardDutyScanner(BaseScanner):
     service = "GUARDDUTY"
 
+    def is_enabled(self, region):
+        try:
+            gd = get_client("guardduty", region)
+            return bool(gd.list_detectors().get("DetectorIds"))
+        except ClientError as e:
+            code = e.response["Error"]["Code"]
+            if code in ("AccessDeniedException", "UnauthorizedAccess"):
+                return True  # permission issue, not "not activated"
+            return False
+
     def scan_region(self, region):
         findings = []
         gd = get_client("guardduty", region)
@@ -66,6 +76,17 @@ class SecretsManagerScanner(BaseScanner):
 class MacieScanner(BaseScanner):
     service = "MACIE"
 
+    def is_enabled(self, region):
+        try:
+            status = get_client("macie2", region).get_macie_session().get("status")
+            return status is not None  # any status means it's been activated
+        except ClientError as e:
+            code = e.response["Error"]["Code"]
+            if code in ("AccessDeniedException",):
+                return True  # permission issue, not "not activated"
+            # "Macie is not enabled" → AccessDeniedException or similar
+            return False
+
     def scan_region(self, region):
         findings = []
         try:
@@ -78,6 +99,17 @@ class MacieScanner(BaseScanner):
 
 class SecurityHubScanner(BaseScanner):
     service = "SECURITYHUB"
+
+    def is_enabled(self, region):
+        try:
+            get_client("securityhub", region).describe_hub()
+            return True
+        except ClientError as e:
+            code = e.response["Error"]["Code"]
+            if code in ("AccessDeniedException",):
+                return True
+            # InvalidAccessException = "not subscribed to Security Hub"
+            return False
 
     def scan_region(self, region):
         findings = []

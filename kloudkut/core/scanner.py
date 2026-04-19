@@ -93,6 +93,20 @@ class BaseScanner(ABC):
     @abstractmethod
     def scan_region(self, region: str) -> list[Finding]: ...
 
+    def is_enabled(self, region: str) -> bool:
+        """Check if this service is activated/available in the given region.
+
+        Override in scanners for services that require explicit activation
+        (e.g., GuardDuty, Macie, SecurityHub) or aren't available in all
+        regions (e.g., Lightsail).  The default returns True — most AWS
+        services are always available.
+
+        Returns False when the service is *not activated* in the account for
+        that region.  Permission errors (AccessDenied) should NOT cause a
+        False return — those are handled separately.
+        """
+        return True
+
     def scan(self, use_cache: bool = True) -> list[Finding]:
         # Fix #4: cache key includes config hash so threshold changes invalidate cache
         cache_key = f"{self.service}:{','.join(sorted(self.regions))}:{self._config_hash}"

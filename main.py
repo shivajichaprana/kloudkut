@@ -111,38 +111,79 @@ def _generate_junit(findings, path: str) -> None:
     _safe_output_path(path).write_text(xml)
 
 
+def _check_service_availability(scanner, regions):
+    """Check if a service is enabled in at least one region.
+
+    Returns (is_available, skipped_regions) where skipped_regions is the list
+    of regions where the service is not activated.
+    """
+    skipped_regions = []
+    available_regions = []
+    for region in regions:
+        try:
+            if scanner.is_enabled(region):
+                available_regions.append(region)
+            else:
+                skipped_regions.append(region)
+        except Exception:
+            # If the check itself fails, assume it's available (scan will
+            # handle the error gracefully via _safe_scan).
+            available_regions.append(region)
+    return available_regions, skipped_regions
+
+
 def _run_scanners(scanners, config, regions, no_cache, session=None, label=""):
     """Run scanners, optionally injecting a specific boto3 session for multi-account."""
     import kloudkut.core.aws as aws_module
     from tqdm import tqdm
 
     findings = []
+    skipped_services = {}  # {service_name: [skipped_regions]}
+
     with tqdm(scanners, desc=f"Scanning {label}".strip(), unit="svc", colour="cyan") as bar:
         for scanner_cls in bar:
-            bar.set_description(f"Scanning {scanner_cls.service:<20}")
+            bar.set_description(f"Checking {scanner_cls.service:<20}")
+
             if session:
-                # Temporarily patch get_client to use the assumed-role session
                 orig = aws_module.get_client
                 aws_module.get_client = lambda svc, reg: _make_session_client(session, svc, reg)
                 try:
                     scanner = scanner_cls(config, regions)
+                    available_regions, skipped_regions = _check_service_availability(scanner, regions)
+                    if skipped_regions:
+                        skipped_services[scanner_cls.service] = skipped_regions
+                    if not available_regions:
+                        continue
+                    scanner.regions = available_regions
+                    bar.set_description(f"Scanning {scanner_cls.service:<20}")
                     findings.extend(scanner.scan(use_cache=False))
                 finally:
                     aws_module.get_client = orig
             else:
                 scanner = scanner_cls(config, regions)
+                available_regions, skipped_regions = _check_service_availability(scanner, regions)
+                if skipped_regions:
+                    skipped_services[scanner_cls.service] = skipped_regions
+                if not available_regions:
+                    continue
+                scanner.regions = available_regions
+                bar.set_description(f"Scanning {scanner_cls.service:<20}")
                 findings.extend(scanner.scan(use_cache=not no_cache))
-    return findings
+
+    return findings, skipped_services
 
 
 def _make_session_client(session, svc, reg):
     return get_client_for_session(session, svc, reg)
+
+
+class _NullCtx:
     def __init__(self, it): self._it = it
     def __enter__(self): return self._it
     def __exit__(self, *_): pass
 
 
-class _NullCtx:
+def main():
     parser = argparse.ArgumentParser(prog="kloudkut", description="AWS Cost Optimization")
     parser.add_argument("--version", action="version", version=f"kloudkut {__version__}")
     parser.add_argument("--services", nargs="+", metavar="SVC")
@@ -271,13 +312,16 @@ class _NullCtx:
     else:
         accounts_to_scan = [("default", None)]  # None = use default lru_cache clients
 
+    all_skipped = {}  # {service: [regions]} across all accounts
     try:
         for account_id, acct_session in accounts_to_scan:
             label = f"[{account_id}]" if len(accounts_to_scan) > 1 else ""
             pending = [s for s in scanners if s.service not in scanned_services or acct_session]
-            findings = _run_scanners(pending, config, regions, args.no_cache, acct_session, label)
+            findings, skipped = _run_scanners(pending, config, regions, args.no_cache, acct_session, label)
             all_findings.extend(findings)
             _save_partial(all_findings)
+            for svc, regs in skipped.items():
+                all_skipped.setdefault(svc, []).extend(regs)
     except KeyboardInterrupt:
         if not args.quiet:
             print(f"\n{Fore.YELLOW}⚠ Interrupted — partial results saved. Re-run to resume.")
@@ -308,6 +352,19 @@ class _NullCtx:
     save_scan(all_findings)
 
     print_summary(all_findings, elapsed, args.quiet)
+
+    # Show skipped (not-activated) services
+    if all_skipped and not args.quiet:
+        print(f"\n{Fore.YELLOW}{'━'*55}")
+        print(f"  SKIPPED — Services Not Activated ({len(all_skipped)})")
+        print(f"{'━'*55}")
+        for svc, regs in sorted(all_skipped.items()):
+            unique_regs = sorted(set(regs))
+            if len(unique_regs) == len(regions):
+                print(f"  {Fore.YELLOW}⊘ {svc:<25} (all regions)")
+            else:
+                print(f"  {Fore.YELLOW}⊘ {svc:<25} ({', '.join(unique_regs)})")
+        print(f"{Fore.YELLOW}{'━'*55}\n")
 
     def _out(filename):
         return os.path.join(out_dir, filename) if out_dir != "." else filename

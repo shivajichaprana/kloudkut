@@ -167,6 +167,17 @@ class GlueScanner(BaseScanner):
 class LightsailScanner(BaseScanner):
     service = "LIGHTSAIL"
 
+    def is_enabled(self, region):
+        try:
+            get_client("lightsail", region).get_regions()
+            return True
+        except ClientError as e:
+            code = e.response["Error"]["Code"]
+            if code in ("AccessDeniedException",):
+                return True
+            # Lightsail not available in this region
+            return False
+
     def scan_region(self, region):
         findings = []
         try:
