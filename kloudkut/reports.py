@@ -58,6 +58,7 @@ def generate_csv(findings: list[Finding], output_dir: str) -> str:
 def generate_html(findings: list[Finding], path: str) -> str:
     """Write findings to a standalone HTML report. Returns the output path."""
     from collections import defaultdict
+    from html import escape as h
     from kloudkut import __version__
 
     path = _safe_path(path)
@@ -123,12 +124,13 @@ def generate_html(findings: list[Finding], path: str) -> str:
             finding_rows = ""
             for f in sorted(svc_findings, key=lambda x: x.monthly_cost, reverse=True):
                 console_url = f.details.get("console_url", "")
-                link = f'<a href="{console_url}" target="_blank">{f.resource_name}</a>' if console_url else f.resource_name
-                remediation_cell = f'<code>{f.remediation}</code>' if f.remediation else '<span class="na">—</span>'
+                name_escaped = h(f.resource_name)
+                link = f'<a href="{h(console_url)}" target="_blank">{name_escaped}</a>' if console_url else name_escaped
+                remediation_cell = f'<code>{h(f.remediation)}</code>' if f.remediation else '<span class="na">—</span>'
                 finding_rows += (
                     f"<tr>"
                     f"<td>{link}</td>"
-                    f"<td class=\"reason\">{f.reason}</td>"
+                    f"<td class=\"reason\">{h(f.reason)}</td>"
                     f"<td class=\"cost\">${f.monthly_cost:,.2f}</td>"
                     f"<td class=\"remediation\">{remediation_cell}</td>"
                     f"</tr>\n"
@@ -242,6 +244,11 @@ def generate_html(findings: list[Finding], path: str) -> str:
   .findings-table {{ margin: 0; border: none; border-radius: 0; box-shadow: none; }}
   .findings-table th {{ background: #eef2f7; color: #374151; }}
 
+  /* Buttons */
+  .toggle-btn {{ background: #1a1a2e; color: #fff; border: none; padding: 0.4rem 1rem;
+                 border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-weight: 500; }}
+  .toggle-btn:hover {{ background: #16213e; }}
+
   /* Code & links */
   code {{ background: #f1f3f5; padding: 2px 6px; border-radius: 4px; font-size: 0.78rem;
           word-break: break-all; }}
@@ -295,7 +302,13 @@ def generate_html(findings: list[Finding], path: str) -> str:
     {breakdown_rows}
   </table>
 
-  <h3 class="section-title">Findings by Region &amp; Service</h3>
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+    <h3 class="section-title" style="border:none; margin-bottom:0;">Findings by Region &amp; Service</h3>
+    <div style="display:flex; gap:0.5rem;">
+      <button class="toggle-btn" onclick="document.querySelectorAll('.service-block').forEach(b=>b.classList.remove('collapsed'))">Expand All</button>
+      <button class="toggle-btn" onclick="document.querySelectorAll('.service-block').forEach(b=>b.classList.add('collapsed'))">Collapse All</button>
+    </div>
+  </div>
   {region_sections}
 
   <p class="footer">KloudKut v{__version__} &mdash; AWS Cost Optimization</p>

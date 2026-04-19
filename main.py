@@ -100,9 +100,11 @@ def _generate_sarif(findings, path: str) -> None:
 
 
 def _generate_junit(findings, path: str) -> None:
+    from xml.sax.saxutils import escape, quoteattr
+
     cases = "\n".join(
-        f'  <testcase classname="{f.service}" name="{f.resource_name}" time="0">'
-        f'<failure message="{f.reason}">${f.monthly_cost:,.2f}/mo in {f.region}</failure></testcase>'
+        f'  <testcase classname={quoteattr(f.service)} name={quoteattr(f.resource_name)} time="0">'
+        f'<failure message={quoteattr(f.reason)}>${f.monthly_cost:,.2f}/mo in {escape(f.region)}</failure></testcase>'
         for f in findings
     )
     xml = (f'<?xml version="1.0"?>\n'
@@ -136,6 +138,11 @@ def _run_scanners(scanners, config, regions, no_cache, session=None, label=""):
     """Run scanners, optionally injecting a specific boto3 session for multi-account."""
     import kloudkut.core.aws as aws_module
     from tqdm import tqdm
+    from kloudkut.scanners.network import CloudFrontScanner, Route53Scanner
+
+    # Reset global-service dedup flags so each _run_scanners call starts fresh
+    CloudFrontScanner._scanned = False
+    Route53Scanner._scanned = False
 
     findings = []
     skipped_services = {}  # {service_name: [skipped_regions]}

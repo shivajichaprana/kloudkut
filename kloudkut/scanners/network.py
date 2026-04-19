@@ -54,8 +54,14 @@ class NATGatewayScanner(BaseScanner):
 
 class CloudFrontScanner(BaseScanner):
     service = "CLOUDFRONT"
+    _scanned = False  # global service — scan once across all regions
 
     def scan_region(self, region):
+        # CloudFront is global; always queries us-east-1.  Skip duplicate runs.
+        if CloudFrontScanner._scanned:
+            return []
+        CloudFrontScanner._scanned = True
+
         findings = []
         cf = get_client("cloudfront", "us-east-1")
         for page in cf.get_paginator("list_distributions").paginate():
@@ -106,8 +112,14 @@ class VPCEndpointScanner(BaseScanner):
 
 class Route53Scanner(BaseScanner):
     service = "ROUTE53"
+    _scanned = False  # global service — scan once across all regions
 
     def scan_region(self, region):
+        # Route53 is global; always queries us-east-1.  Skip duplicate runs.
+        if Route53Scanner._scanned:
+            return []
+        Route53Scanner._scanned = True
+
         findings = []
         r53 = get_client("route53", "us-east-1")
         for page in r53.get_paginator("list_hosted_zones").paginate():

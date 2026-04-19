@@ -102,13 +102,22 @@ class AthenaScanner(BaseScanner):
     def scan_region(self, region):
         findings = []
         athena = get_client("athena", region)
-        for page in athena.get_paginator("list_work_groups").paginate():
-            for wg in page.get("WorkGroups", []):
+        # list_work_groups does NOT support pagination in boto3 — use direct call
+        token = None
+        while True:
+            kwargs = {"MaxResults": 50}
+            if token:
+                kwargs["NextToken"] = token
+            resp = athena.list_work_groups(**kwargs)
+            for wg in resp.get("WorkGroups", []):
                 name = wg["Name"]
                 if not athena.list_query_executions(WorkGroup=name, MaxResults=5).get("QueryExecutionIds"):
                     findings.append(Finding(name, name, "Athena", region,
                                             "Workgroup has no recent query executions — Athena itself is pay-per-query, but associated S3 result buckets and saved queries still consume storage. Clean up if workgroup is abandoned",
                                             5.0))
+            token = resp.get("NextToken")
+            if not token:
+                break
         return findings
 
 

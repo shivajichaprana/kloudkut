@@ -189,6 +189,10 @@ class LightsailScanner(BaseScanner):
                 return True
             # Lightsail not available in this region
             return False
+        except Exception:
+            # Catch connection errors (EndpointConnectionError, etc.) for
+            # regions where Lightsail has no endpoint at all
+            return False
 
     def scan_region(self, region):
         findings = []
